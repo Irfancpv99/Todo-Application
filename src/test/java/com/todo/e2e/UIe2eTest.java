@@ -23,33 +23,27 @@ public class UIe2eTest {
 
     @BeforeEach
     void setUp() throws Exception {
-    	
-    	try (Connection conn = DatabaseConfig.getConnection()) {
-            conn.createStatement().execute("DELETE FROM todos");
-            conn.createStatement().execute("DELETE FROM users");
-        }
-    	
+        // Clean database first
+        cleanDatabase();
+
         SwingUtilities.invokeAndWait(() -> {
-            UserService userService = new UserService(); // Replace with real implementation
-            TodoService todoService = new TodoService(); // Replace with real implementation
+            UserService userService = new UserService();
+            TodoService todoService = new TodoService();
             ui = new UI(userService, todoService);
             ui.setVisible(true);
         });
-        Thread.sleep(500);
+        Thread.sleep(500); // Allow UI to stabilize
     }
     
     @AfterEach
     void tearDown() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-        	for (Frame frame : Frame.getFrames()) {
-                frame.dispose();
+            // Dispose all windows
+            for (Window window : Window.getWindows()) {
+                window.dispose();
             }
         });
-        
-        try (Connection conn = DatabaseConfig.getConnection()) {
-            conn.createStatement().execute("DELETE FROM todos");
-            conn.createStatement().execute("DELETE FROM users");
-        }
+        cleanDatabase();
     }
 
     @Test
@@ -190,67 +184,65 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Complete Full User Registration And Login Cycle")
     void testCompleteUserCycle() throws Exception {
-        String username = "testUser";
-        String password = "testPass123";
+        // Clean start
+        cleanDatabase();
+        Thread.sleep(500);
 
-      
+        // Register new user
         SwingUtilities.invokeAndWait(() -> {
-            ui.getUsernameField().setText(username);
-            ui.getPasswordField().setText(password);
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getRegisterButton().doClick();
         });
-        
-       
         Thread.sleep(1000);
 
-       
+        // Verify registration success
         SwingUtilities.invokeAndWait(() -> {
-            assertTrue(ui.getUsernameField().getText().isEmpty(), "Username field should be cleared after registration");
-            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty(), "Password field should be cleared after registration");
+            assertTrue(ui.getUsernameField().getText().isEmpty(), 
+                "Username field should be cleared after registration");
+            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty(), 
+                "Password field should be cleared after registration");
         });
 
-       
+        // Perform login
         SwingUtilities.invokeAndWait(() -> {
-            ui.getUsernameField().setText(username);
-            ui.getPasswordField().setText(password);
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getLoginButton().doClick();
         });
-        
-       
-        Thread.sleep(1000);
+        Thread.sleep(1000); // Wait for TodoUI to appear
 
-       
+        // Verify TodoUI state
         SwingUtilities.invokeAndWait(() -> {
-         
-            assertFalse(ui.isVisible(), "Login UI should not be visible after successful login");
-            
-       
-            boolean todoUIFound = false;
+            // First verify login UI is hidden
+            assertFalse(ui.isVisible(), "Login UI should be hidden");
+
+            // Find and verify TodoUI
             TodoUI foundTodoUI = null;
-            
-            for (Frame frame : Frame.getFrames()) {
-                if (frame instanceof TodoUI todoUI) {
-                    todoUIFound = true;
-                    foundTodoUI = todoUI;
-                    assertTrue(frame.isVisible(), "TodoUI should be visible");
-                    
-                           try {
-                        var field = TodoUI.class.getDeclaredField("usernameLabel");
-                        field.setAccessible(true);
-                        JLabel usernameLabel = (JLabel) field.get(todoUI);
-                        assertTrue(usernameLabel.getText().contains(username), 
-                            "Username should be displayed in TodoUI");
-                    } catch (Exception e) {
-                        fail("Failed to verify username display: " + e.getMessage());
-                    }
+            for (Window window : Window.getWindows()) {
+                if (window instanceof TodoUI && window.isDisplayable()) {
+                    foundTodoUI = (TodoUI) window;
                     break;
                 }
             }
-            
-            assertTrue(todoUIFound, "TodoUI should be found among active frames");
-            
-                   if (foundTodoUI != null) {
-                foundTodoUI.dispose();
+
+            // Verify TodoUI was found and is visible
+            assertNotNull(foundTodoUI, "TodoUI instance should exist");
+            assertTrue(foundTodoUI.isDisplayable(), "TodoUI should be displayable");
+            assertTrue(foundTodoUI.isVisible(), "TodoUI should be visible");
+
+            // Verify username label if TodoUI was found
+            if (foundTodoUI != null) {
+                try {
+                    var field = TodoUI.class.getDeclaredField("usernameLabel");
+                    field.setAccessible(true);
+                    JLabel usernameLabel = (JLabel) field.get(foundTodoUI);
+                    String labelText = usernameLabel.getText();
+                    assertTrue(labelText.contains(TEST_USERNAME), 
+                        "Username '" + TEST_USERNAME + "' should be in label text: '" + labelText + "'");
+                } catch (Exception e) {
+                    fail("Failed to verify username label: " + e.getMessage());
+                }
             }
         });
     }
@@ -353,4 +345,12 @@ public class UIe2eTest {
         });
     }
     
+    private void cleanDatabase() {
+        try (Connection conn = DatabaseConfig.getConnection()) {
+            conn.createStatement().execute("DELETE FROM todos");
+            conn.createStatement().execute("DELETE FROM users");
+        } catch (Exception e) {
+            System.err.println("Failed to clean database: " + e.getMessage());
+        }
+    }
 }
