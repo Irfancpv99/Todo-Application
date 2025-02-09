@@ -212,6 +212,49 @@ public class UIe2eTest {
         }
     }
     
+    @Test
+    @DisplayName("Should Handle System State Recovery")
+    void testSystemStateRecovery() throws Exception {
+        // Register user
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+        Thread.sleep(500);
+
+        // Close UI
+        SwingUtilities.invokeAndWait(() -> ui.dispose());
+
+        // Create new UI instance
+        SwingUtilities.invokeAndWait(() -> {
+            UserService userService = new UserService();
+            TodoService todoService = new TodoService();
+            ui = new UI(userService, todoService);
+            ui.setVisible(true);
+        });
+
+        // Try to login with previous credentials
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getLoginButton().doClick();
+        });
+        Thread.sleep(500);
+
+        SwingUtilities.invokeAndWait(() -> {
+            assertFalse(ui.isVisible());
+            boolean todoUIFound = false;
+            for (Frame frame : Frame.getFrames()) {
+                if (frame instanceof TodoUI && frame.isVisible()) {
+                    todoUIFound = true;
+                    break;
+                }
+            }
+            assertTrue(todoUIFound);
+        });
+    }
+    
     
     
 
