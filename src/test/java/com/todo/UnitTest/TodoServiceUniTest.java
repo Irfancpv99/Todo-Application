@@ -99,6 +99,76 @@ class TodoServiceUniTest {
         assertEquals(originalDueDate, updatedTodo.getDueDate());
         assertEquals(Tags.Urgent, updatedTodo.getTags());
     }
+    
+    @Test
+    @DisplayName("Test Next User Specific ID Management")
+    void testNextUserSpecificId() {
+        TodoService todoService = new TodoService();
+        
+        
+        assertEquals(1, todoService.getNextUserSpecificId());
+        
+        
+        assertEquals(2, todoService.getNextUserSpecificId());
+        assertEquals(3, todoService.getNextUserSpecificId());
+        
+        
+        todoService.setNextUserSpecificId(10);
+        assertEquals(10, todoService.getNextUserSpecificId());
+        assertEquals(11, todoService.getNextUserSpecificId());
+    }
+    
+    @Test
+    @DisplayName("Test Transaction Rollback on Error")
+    void testTransactionRollback() {
+
+        assertThrows(RuntimeException.class, () -> {
+            todoService.createTodo(
+                1,
+                -1, 
+                "Test Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
+        });
+        
+      
+        List<Todo> todos = todoService.getTodosByUserId(TEST_USER_ID);
+        assertTrue(todos.isEmpty());
+    }
+    
+//    @Test
+//    @DisplayName("Test Todo Creation with Edge Cases")
+//    void testCreateTodoEdgeCases() {
+//        // Test with minimum valid data
+//        Todo todo = todoService.createTodo(
+//            1,
+//            TEST_USER_ID,
+//            "Title",
+//            "", // Empty description
+//            LocalDate.now(),
+//            Priority.LOW,
+//            Tags.Work
+//        );
+//        assertNotNull(todo);
+//        assertEquals("", todo.getDescription());
+//
+//        // Test with future date
+//        LocalDate futureDate = LocalDate.now().plusYears(1);
+//        Todo futureTodo = todoService.createTodo(
+//            2,
+//            TEST_USER_ID,
+//            "Future Todo",
+//            "Description",
+//            futureDate,
+//            Priority.HIGH,
+//            Tags.Urgent
+//        );
+//        assertNotNull(futureTodo);
+//        assertEquals(futureDate, futureTodo.getDueDate());
+//    }
 
     
     @Test

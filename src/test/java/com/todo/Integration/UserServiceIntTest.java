@@ -7,6 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 class UserServiceIntTest {
     private UserService userService;
     private static final String TEST_USERNAME = "testuser";
@@ -107,5 +111,78 @@ class UserServiceIntTest {
         User loggedInUser = newUserService.login(TEST_USERNAME, TEST_PASSWORD);
         assertNotNull(loggedInUser);
         assertEquals(TEST_USERNAME, loggedInUser.getUsername());
+    }
+    
+    @Test
+    @DisplayName("Database State After Failed Registration")
+    void testDatabaseStateAfterFailedRegistration() {
+        // Create initial user
+        User user = userService.registerUser("testuser", "password123");
+        assertNotNull(user);
+        
+        // Attempt to create user with same username
+        assertThrows(IllegalArgumentException.class, () -> 
+            userService.registerUser("testuser", "newpassword")
+        );
+        
+        // Verify database state
+        assertTrue(userService.isUsernameTaken("testuser"));
+        
+        // Verify original user can still login
+        User loggedInUser = userService.login("testuser", "password123");
+        assertNotNull(loggedInUser);
+        assertEquals(user.getUserid(), loggedInUser.getUserid());
+    }
+    
+    @Test
+    @DisplayName("Concurrent User Registration")
+    void testConcurrentUserRegistration() throws InterruptedException {
+        int numThreads = 5;
+        CountDownLatch latch = new CountDownLatch(numThreads);
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+
+        for (int i = 0; i < numThreads; i++) {
+            final int index = i;
+            new Thread(() -> {
+                try {
+                    userService.registerUser("user" + index, "password" + index);
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    failCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            }).start();
+        }
+
+        latch.await(5, TimeUnit.SECONDS);
+        assertEquals(numThreads, successCount.get());
+        assertEquals(0, failCount.get());
+        
+        // Verify all users were created and can login
+        for (int i = 0; i < numThreads; i++) {
+            User user = userService.login("user" + i, "password" + i);
+            assertNotNull(user);
+        }
+    }
+    
+    @Test
+    @DisplayName("Username Uniqueness Constraint Test")
+    void testUsernameUniquenessConstraint() {
+        // First registration should succeed
+        User firstUser = userService.registerUser("uniqueuser", "password123");
+        assertNotNull(firstUser);
+        
+        // Second registration with same username should fail
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            userService.registerUser("uniqueuser", "differentpassword");
+        });
+        assertEquals("User already exists.", exception.getMessage());
+        
+        // Original user should still be able to login
+        User loggedInUser = userService.login("uniqueuser", "password123");
+        assertNotNull(loggedInUser);
+        assertEquals(firstUser.getUserid(), loggedInUser.getUserid());
     }
 }

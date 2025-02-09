@@ -88,4 +88,46 @@ class UserServiceUniTest {
         });
         assertEquals("Invalid username or password", exception2.getMessage());
     }
+    
+    @Test
+    @DisplayName("Clear users should remove all existing users")
+    void testClearUsers() {
+        userService.registerUser("user1", "pass1");
+        userService.registerUser("user2", "pass2");
+
+        assertTrue(userService.isUsernameTaken("user1"));
+        assertTrue(userService.isUsernameTaken("user2"));        
+        
+        UserService.clearUsers();
+        
+        assertFalse(userService.isUsernameTaken("user1"));
+        assertFalse(userService.isUsernameTaken("user2"));
+    }
+    
+    @Test
+    @DisplayName("Login should fail with empty credentials")
+    void testLoginWithEmptyCredentials() {
+        assertThrows(IllegalArgumentException.class,
+            () -> userService.login("", "password123"));
+            
+        assertThrows(IllegalArgumentException.class,
+            () -> userService.login("username", ""));
+            
+        assertThrows(IllegalArgumentException.class,
+            () -> userService.login(null, "password123"));
+            
+        assertThrows(IllegalArgumentException.class,
+            () -> userService.login("username", null));
+    }
+
+    @Test
+    @DisplayName("Database error handling in user operations")
+    void testDatabaseErrorHandling() {
+        
+        userService.registerUser("user1", "pass1");
+        assertThrows(IllegalArgumentException.class,
+            () -> userService.registerUser("user1", "pass2"));
+    }
 }
+
+

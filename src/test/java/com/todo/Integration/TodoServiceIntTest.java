@@ -4,14 +4,20 @@ package com.todo.Integration;
 import com.todo.model.Priority;
 import com.todo.model.Status;
 import com.todo.model.Tags;
+import com.todo.model.Todo;
 import com.todo.service.TodoService;
 import com.todo.service.UserService;
 import com.todo.config.DatabaseConfig;
 
 import org.junit.jupiter.api.*;
 import java.time.LocalDate;
+import java.util.List;
 //import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.sql.Connection;
 import java.sql.Statement;
 
@@ -250,5 +256,190 @@ class TodoServiceIntTest {
         var retrievedTodo = todoService.getTodoById(todo.getId());
         assertNotNull(retrievedTodo);
         assertEquals("Transaction Test", retrievedTodo.getTitle());
+    }
+    
+    @Test
+    @DisplayName("Transaction Rollback on Failed Todo Creation")
+    void testTransactionRollbackOnFailure() {
+        // Attempt to create todo with non-existent user
+        int nonExistentUserId = 99999;
+        assertThrows(RuntimeException.class, () -> {
+            todoService.createTodo(
+                1,
+                nonExistentUserId,
+                "Test Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
+        });
+        
+        // Verify no todos were created
+        var todos = todoService.getTodosByUserId(nonExistentUserId);
+        assertTrue(todos.isEmpty());
+    }
+    
+    @Test
+    @DisplayName("Concurrent Todo Operations")
+    void testConcurrentTodoOperations() throws InterruptedException {
+        int numThreads = 5;
+        CountDownLatch latch = new CountDownLatch(numThreads);
+        AtomicInteger successCount = new AtomicInteger(0);
+        ConcurrentHashMap<Integer, Todo> createdTodos = new ConcurrentHashMap<>();
+
+        for (int i = 0; i < numThreads; i++) {
+            final int index = i;
+            new Thread(() -> {
+                try {
+                    Todo todo = todoService.createTodo(
+                        index + 1,
+                        userId,
+                        "Concurrent Task " + index,
+                        "Description",
+                        LocalDate.now(),
+                        Priority.MEDIUM,
+                        Tags.Work
+                    );
+                    createdTodos.put(index, todo);
+                    successCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            }).start();
+        }
+
+        latch.await(5, TimeUnit.SECONDS);
+        assertEquals(numThreads, successCount.get());
+        
+        // Verify all todos were created
+        var allTodos = todoService.getTodosByUserId(userId);
+        assertEquals(numThreads, allTodos.size());
+        
+        // Verify each todo can be retrieved individually
+        createdTodos.forEach((index, todo) -> {
+            var retrievedTodo = todoService.getTodoById(todo.getId());
+            assertNotNull(retrievedTodo);
+            assertEquals("Concurrent Task " + index, retrievedTodo.getTitle());
+        });
+    }
+    
+    @Test
+    @DisplayName("Edge Cases in Todo Status Updates")
+    void testTodoStatusEdgeCases() {
+        // Create a todo
+        var todo = todoService.createTodo(
+            1,
+            userId,
+            "Status Test",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        
+        // Test multiple status transitions
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            todo.getTags(),
+            true
+        );
+        assertEquals(Status.COMPLETED, todo.getStatus());
+        
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            todo.getTags(),
+            false
+        );
+        assertEquals(Status.PENDING, todo.getStatus());
+    }
+    
+    @Test
+    @DisplayName("User-Specific ID Management")
+    void testUserSpecificIdManagement() {
+        // Create first todo
+        todoService.setNextUserSpecificId(1);
+        Todo todo1 = todoService.createTodo(
+            todoService.getNextUserSpecificId(),
+            userId,
+            "Task 1",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        
+        // Create second todo
+        Todo todo2 = todoService.createTodo(
+            todoService.getNextUserSpecificId(),
+            userId,
+            "Task 2",
+            "Description",
+            LocalDate.now(),
+            Priority.MEDIUM,
+            Tags.Home
+        );
+
+        // Verify todos were created
+        List<Todo> todos = todoService.getTodosByUserId(userId);
+        assertEquals(2, todos.size());
+
+        // Verify specific todos exist and can be retrieved
+        Todo retrievedTodo1 = todoService.getTodoById(todo1.getId());
+        Todo retrievedTodo2 = todoService.getTodoById(todo2.getId());
+        
+        assertNotNull(retrievedTodo1, "First todo should exist");
+        assertNotNull(retrievedTodo2, "Second todo should exist");
+        assertEquals("Task 1", retrievedTodo1.getTitle());
+        assertEquals("Task 2", retrievedTodo2.getTitle());
+        
+        // Now test with a new service instance
+        TodoService newTodoService = new TodoService();
+        newTodoService.setNextUserSpecificId(3);
+        
+        Todo todo3 = newTodoService.createTodo(
+            newTodoService.getNextUserSpecificId(),
+            userId,
+            "Task 3",
+            "Description",
+            LocalDate.now(),
+            Priority.HIGH,
+            Tags.Urgent
+        );
+
+        // Verify all todos exist
+        List<Todo> allTodos = todoService.getTodosByUserId(userId);
+        assertEquals(3, allTodos.size(), "Should have all three todos");
+        
+        // Verify we can find all three tasks by their titles
+        boolean foundTask1 = false, foundTask2 = false, foundTask3 = false;
+        
+        for (Todo todo : allTodos) {
+            switch (todo.getTitle()) {
+                case "Task 1":
+                    foundTask1 = true;
+                    break;
+                case "Task 2":
+                    foundTask2 = true;
+                    break;
+                case "Task 3":
+                    foundTask3 = true;
+                    break;
+            }
+        }
+        
+        assertTrue(foundTask1, "Task 1 should exist");
+        assertTrue(foundTask2, "Task 2 should exist");
+        assertTrue(foundTask3, "Task 3 should exist");
     }
 }
