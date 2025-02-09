@@ -3,6 +3,8 @@ package com.todo.e2e;
 import com.todo.service.UserService;
 import com.todo.service.TodoService;
 import com.todo.ui.*;
+import com.todo.config.DatabaseConfig;
+import java.sql.Connection;
 
 import javax.swing.*;
 import java.awt.*;
@@ -21,6 +23,12 @@ public class UIe2eTest {
 
     @BeforeEach
     void setUp() throws Exception {
+    	
+    	try (Connection conn = DatabaseConfig.getConnection()) {
+            conn.createStatement().execute("DELETE FROM todos");
+            conn.createStatement().execute("DELETE FROM users");
+        }
+    	
         SwingUtilities.invokeAndWait(() -> {
             UserService userService = new UserService(); // Replace with real implementation
             TodoService todoService = new TodoService(); // Replace with real implementation
@@ -77,22 +85,39 @@ public class UIe2eTest {
     @Test
     @DisplayName("Valid Login")
     void testValidLogin() throws Exception {
+        // First register a user
         SwingUtilities.invokeAndWait(() -> {
-            ui.getUsernameField().setText("validUser");
-            ui.getPasswordField().setText("securePass123");
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+        Thread.sleep(500);
+
+        // Then attempt login
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getLoginButton().doClick();
         });
+        Thread.sleep(500);
 
         SwingUtilities.invokeAndWait(() -> {
             assertFalse(ui.isVisible(), "Login UI should be hidden after successful login.");
             boolean todoUIVisible = false;
+            TodoUI todoUI = null;
+            
             for (Frame frame : Frame.getFrames()) {
                 if (frame instanceof TodoUI && frame.isVisible()) {
                     todoUIVisible = true;
+                    todoUI = (TodoUI) frame;
                     break;
                 }
             }
             assertTrue(todoUIVisible, "TodoUI should be visible after successful login.");
+            
+            if (todoUI != null) {
+                todoUI.dispose();
+            }
         });
     }
 
@@ -255,9 +280,39 @@ public class UIe2eTest {
         });
     }
     
-    
-    
+    @Test
+    @DisplayName("Should Handle UI Component States")
+    void testUIComponentStates() throws Exception {
+        // Test initial state
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(ui.getRegisterButton().isEnabled());
+            assertTrue(ui.getLoginButton().isEnabled());
+            assertTrue(ui.getUsernameField().isEnabled());
+            assertTrue(ui.getPasswordField().isEnabled());
+            assertTrue(ui.getUsernameField().getText().isEmpty());
+            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
+        });
 
+        // Test state after invalid input
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText("");
+            ui.getPasswordField().setText("");
+            ui.getLoginButton().doClick();
+        });
+        Thread.sleep(200);
+
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(ui.getRegisterButton().isEnabled());
+            assertTrue(ui.getLoginButton().isEnabled());
+            assertTrue(ui.getUsernameField().isEnabled());
+            assertTrue(ui.getPasswordField().isEnabled());
+        });
+    }
+    
+   
+    
+    
+    
     @AfterEach
     void tearDown() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
