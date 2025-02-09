@@ -203,32 +203,46 @@ public class UIIntTest {
     @Test
     @DisplayName("Should Handle TodoUI Launch With Different Screen Sizes")
     void testTodoUILaunchWithDifferentScreenSizes() throws Exception {
+        // Create a test user
         User mockUser = new User(1, TEST_USERNAME, TEST_PASSWORD);
         when(userServiceMock.login(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
 
+
         SwingUtilities.invokeAndWait(() -> {
-            // Set different screen sizes
             ui.setSize(800, 600);
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getLoginButton().doClick();
         });
-
-        Thread.sleep(500);
+        
+        
+        Thread.sleep(1000);
 
         SwingUtilities.invokeAndWait(() -> {
+        
+            assertFalse(ui.isVisible(), "Login UI should not be visible after successful login");
+            
+            
             boolean todoUIFound = false;
+            TodoUI foundTodoUI = null;
+            
             for (Frame frame : Frame.getFrames()) {
-                if (frame instanceof TodoUI) {
+                if (frame instanceof TodoUI todoUI) {
                     todoUIFound = true;
-                    assertTrue(frame.isVisible());
+                    foundTodoUI = todoUI;
+                    assertTrue(frame.isVisible(), "TodoUI should be visible");
                     break;
                 }
             }
-            assertTrue(todoUIFound);
+            
+            assertTrue(todoUIFound, "TodoUI should be found among active frames");
+            
+            
+            if (foundTodoUI != null) {
+                foundTodoUI.dispose();
+            }
         });
     }
-
 
     @AfterEach
     void tearDown() {

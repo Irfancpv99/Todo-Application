@@ -174,40 +174,68 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Complete Full User Registration And Login Cycle")
     void testCompleteUserCycle() throws Exception {
-        // Register
+        String username = "testUser";
+        String password = "testPass123";
+
+      
         SwingUtilities.invokeAndWait(() -> {
-            ui.getUsernameField().setText(TEST_USERNAME);
-            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getUsernameField().setText(username);
+            ui.getPasswordField().setText(password);
             ui.getRegisterButton().doClick();
         });
-        Thread.sleep(500);
+        
+       
+        Thread.sleep(1000);
 
-        // Verify registration success
+       
         SwingUtilities.invokeAndWait(() -> {
-            assertTrue(ui.getUsernameField().getText().isEmpty());
-            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
+            assertTrue(ui.getUsernameField().getText().isEmpty(), "Username field should be cleared after registration");
+            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty(), "Password field should be cleared after registration");
         });
 
-        // Login
+       
         SwingUtilities.invokeAndWait(() -> {
-            ui.getUsernameField().setText(TEST_USERNAME);
-            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getUsernameField().setText(username);
+            ui.getPasswordField().setText(password);
             ui.getLoginButton().doClick();
         });
-        Thread.sleep(500);
+        
+       
+        Thread.sleep(1000);
 
-        // Verify TodoUI launched
+       
         SwingUtilities.invokeAndWait(() -> {
-            assertFalse(ui.isVisible());
+            // First verify login UI is hidden
+            assertFalse(ui.isVisible(), "Login UI should not be visible after successful login");
+            
+       
             boolean todoUIFound = false;
+            TodoUI foundTodoUI = null;
+            
             for (Frame frame : Frame.getFrames()) {
-                if (frame instanceof TodoUI) {
+                if (frame instanceof TodoUI todoUI) {
                     todoUIFound = true;
-                    assertTrue(frame.isVisible());
+                    foundTodoUI = todoUI;
+                    assertTrue(frame.isVisible(), "TodoUI should be visible");
+                    
+                           try {
+                        var field = TodoUI.class.getDeclaredField("usernameLabel");
+                        field.setAccessible(true);
+                        JLabel usernameLabel = (JLabel) field.get(todoUI);
+                        assertTrue(usernameLabel.getText().contains(username), 
+                            "Username should be displayed in TodoUI");
+                    } catch (Exception e) {
+                        fail("Failed to verify username display: " + e.getMessage());
+                    }
                     break;
                 }
             }
-            assertTrue(todoUIFound);
+            
+            assertTrue(todoUIFound, "TodoUI should be found among active frames");
+            
+                   if (foundTodoUI != null) {
+                foundTodoUI.dispose();
+            }
         });
     }
     
