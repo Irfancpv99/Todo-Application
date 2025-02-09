@@ -11,9 +11,11 @@ import org.mockito.MockitoAnnotations;
 import javax.swing.*;
 
 import java.awt.Container;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -198,6 +200,117 @@ class TodoUIUnitTest {
         assertEquals(1, todoTable.getRowCount());
         assertEquals("High Priority", todoTable.getValueAt(0, 1));
     }
+    
+    
+    @Test
+    @DisplayName("Test Clear Filter Button")
+    void testClearFilter() {
+        // Setup initial todos
+        List<Todo> todos = Arrays.asList(
+            new Todo(1, 1, "High Priority", "Test", LocalDate.now(), Priority.HIGH, Tags.Work),
+            new Todo(2, 1, "Low Priority", "Test", LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+        when(todoService.getTodosByUserId(1)).thenReturn(todos);
+        
+        // Apply filter first
+        JComboBox<Priority> filterComboBox = findComboBoxByName(todoUI, "filterPriorityComboBox");
+        filterComboBox.setSelectedItem(Priority.HIGH);
+        findAndClickButton(todoUI, "Apply Filter");
+        
+        // Clear filter
+        findAndClickButton(todoUI, "Clear Filter");
+        
+        // Verify table shows all todos
+        JTable todoTable = (JTable) getPrivateField(todoUI, "todoTable");
+        assertEquals(2, todoTable.getRowCount(), "All todos should be visible after clearing filter");
+    }
+    
+    @Test
+    @DisplayName("Test Clear Fields Button")
+    void testClearFields() {
+        // Set field values
+        JTextField titleField = (JTextField) getPrivateField(todoUI, "titleField");
+        JTextField descriptionField = (JTextField) getPrivateField(todoUI, "descriptionField");
+        JTextField dateField = (JTextField) getPrivateField(todoUI, "dateField");
+        
+        titleField.setText("Test Title");
+        descriptionField.setText("Test Description");
+        dateField.setText("2025-01-01");
+        
+        // Click clear button
+        findAndClickButton(todoUI, "Clear");
+        
+        // Verify fields are cleared
+        assertTrue(titleField.getText().isEmpty(), "Title field should be empty");
+        assertTrue(descriptionField.getText().isEmpty(), "Description field should be empty");
+        assertTrue(dateField.getText().isEmpty(), "Date field should be empty");
+    }
+    
+    @Test
+    @DisplayName("Date Format Validation Should Handle Invalid Inputs")
+    void testDateFormatValidation() {
+        record InvalidDateTest(String date, String description) {}
+        
+        // First add a valid todo
+        var titleField = getPrivateField(todoUI, "titleField", JTextField.class);
+        var descField = getPrivateField(todoUI, "descriptionField", JTextField.class);
+        var dateField = getPrivateField(todoUI, "dateField", JTextField.class);
+        var priorityBox = getPrivateField(todoUI, "priorityComboBox", JComboBox.class);
+        var tagsBox = getPrivateField(todoUI, "tagsComboBox", JComboBox.class);
+        
+        // Set valid values
+        titleField.setText("Valid Todo");
+        descField.setText("Valid Description");
+        dateField.setText("2025-12-31");
+        priorityBox.setSelectedItem(Priority.HIGH);
+        tagsBox.setSelectedItem(Tags.Work);
+        
+        // Add valid todo
+        when(todoService.createTodo(
+            anyInt(), anyInt(), eq("Valid Todo"), eq("Valid Description"),
+            any(LocalDate.class), eq(Priority.HIGH), eq(Tags.Work)))
+        .thenReturn(new Todo(1, 1, "Valid Todo", "Valid Description", 
+                           LocalDate.parse("2025-12-31"), Priority.HIGH, Tags.Work));
+        
+        findButtonByText(todoUI, "Add").doClick();
+        
+        // Verify valid todo was added
+        verify(todoService).createTodo(
+            anyInt(), anyInt(), eq("Valid Todo"), eq("Valid Description"),
+            any(LocalDate.class), eq(Priority.HIGH), eq(Tags.Work));
+        
+        // Now test invalid dates
+        var invalidDates = Arrays.asList(
+            new InvalidDateTest("01-01-2025", "Wrong format"),
+            new InvalidDateTest("2025/01/01", "Wrong separator"),
+            new InvalidDateTest("2025-13-01", "Invalid month"),
+            new InvalidDateTest("2025-01-32", "Invalid day"),
+            new InvalidDateTest("202S-01-01", "Non-numeric")
+        );
+        
+        // Reset verification counts after valid todo
+        reset(todoService);
+        
+        for (var testCase : invalidDates) {
+            // Set new invalid date while keeping other fields valid
+            titleField.setText("Test Todo");
+            descField.setText("Test Description");
+            dateField.setText(testCase.date());
+            priorityBox.setSelectedItem(Priority.HIGH);
+            tagsBox.setSelectedItem(Tags.Work);
+            
+            findButtonByText(todoUI, "Add").doClick();
+            
+            verify(todoService, never()).createTodo(
+                anyInt(), anyInt(), anyString(), anyString(), 
+                any(LocalDate.class), any(Priority.class), any(Tags.class)
+            );
+        }
+    }
+    
+
+    
+    
 
     // Helper methods
     private void setupTableWithTestData(Todo todo) {
@@ -206,6 +319,8 @@ class TodoUIUnitTest {
         when(todoService.getTodosByUserId(1)).thenReturn(todos);
         invokeRefreshTable();
     }
+    
+    
 
     private void invokeRefreshTable() {
         try {
@@ -235,6 +350,28 @@ class TodoUIUnitTest {
             }
         }
         return null;
+    }
+    
+    private Object getPrivateField(Object obj, String fieldName) {
+        try {
+            Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field.get(obj);
+        } catch (Exception e) {
+            fail("Failed to get field: " + fieldName);
+            return null;
+        }
+    }
+    
+    private <T> T getPrivateField(Object obj, String fieldName, Class<T> fieldType) {
+        try {
+            Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return fieldType.cast(field.get(obj));
+        } catch (Exception e) {
+            fail("Failed to get field: " + fieldName + ", error: " + e.getMessage());
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")

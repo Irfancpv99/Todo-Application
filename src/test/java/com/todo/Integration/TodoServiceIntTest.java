@@ -442,4 +442,96 @@ class TodoServiceIntTest {
         assertTrue(foundTask2, "Task 2 should exist");
         assertTrue(foundTask3, "Task 3 should exist");
     }
+    
+    @Test
+    @DisplayName("Test Complex Transaction Scenarios")
+    void testComplexTransactionScenarios() {
+        // First create a successful todo
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Valid Todo",
+            "Description",
+            LocalDate.now(),
+            Priority.MEDIUM,
+            Tags.Work
+        );
+        assertNotNull(todo);
+
+        // Test rollback with invalid userId
+        assertThrows(RuntimeException.class, () -> {
+            todoService.createTodo(
+                2,
+                -999, // Invalid user ID to force foreign key constraint violation
+                "Invalid Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
+        });
+
+        // Verify the successful todo still exists
+        Todo retrievedTodo = todoService.getTodoById(todo.getId());
+        assertNotNull(retrievedTodo);
+        assertEquals("Valid Todo", retrievedTodo.getTitle());
+    }
+
+    @Test
+    @DisplayName("Test Updating Non-existent Todo")
+    void testUpdateNonExistentTodo() {
+        assertThrows(NoSuchElementException.class, () -> {
+            todoService.updateTodo(
+                99999, // Non-existent ID
+                userId,
+                "Updated Title",
+                "Updated Description",
+                LocalDate.now(),
+                Priority.HIGH,
+                Tags.Urgent,
+                true
+            );
+        });
+    }
+
+    @Test
+    @DisplayName("Test Todo Status Transitions")
+    void testTodoStatusTransitions() {
+      
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Status Test",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            todo.getTags(),
+            true 
+        );
+        assertTrue(todo.isCompleted());
+        assertEquals(Status.COMPLETED, todo.getStatus());
+
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            todo.getTags(),
+            false 
+        );
+        assertFalse(todo.isCompleted());
+        assertEquals(Status.PENDING, todo.getStatus());
+    }
 }

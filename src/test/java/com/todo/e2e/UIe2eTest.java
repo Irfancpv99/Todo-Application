@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 public class UIe2eTest {
 
     private UI ui;
+    private static final String TEST_USERNAME = "e2etestuser";
+    private static final String TEST_PASSWORD = "e2etestpass123";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -144,6 +146,71 @@ public class UIe2eTest {
         });
     }
     
+    @Test
+    @DisplayName("Should Complete Full User Registration And Login Cycle")
+    void testCompleteUserCycle() throws Exception {
+        // Register
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+        Thread.sleep(500);
+
+        // Verify registration success
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(ui.getUsernameField().getText().isEmpty());
+            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
+        });
+
+        // Login
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getLoginButton().doClick();
+        });
+        Thread.sleep(500);
+
+        // Verify TodoUI launched
+        SwingUtilities.invokeAndWait(() -> {
+            assertFalse(ui.isVisible());
+            boolean todoUIFound = false;
+            for (Frame frame : Frame.getFrames()) {
+                if (frame instanceof TodoUI) {
+                    todoUIFound = true;
+                    assertTrue(frame.isVisible());
+                    break;
+                }
+            }
+            assertTrue(todoUIFound);
+        });
+    }
+    
+    @Test
+    @DisplayName("Should Handle Concurrent User Operations")
+    void testConcurrentUserOperations() throws Exception {
+        // Create multiple users rapidly
+        for (int i = 0; i < 5; i++) {
+            final int index = i;
+            SwingUtilities.invokeAndWait(() -> {
+                ui.getUsernameField().setText(TEST_USERNAME + index);
+                ui.getPasswordField().setText(TEST_PASSWORD);
+                ui.getRegisterButton().doClick();
+            });
+            Thread.sleep(200);
+        }
+
+        // Try to login with each user
+        for (int i = 0; i < 5; i++) {
+            final int index = i;
+            SwingUtilities.invokeAndWait(() -> {
+                ui.getUsernameField().setText(TEST_USERNAME + index);
+                ui.getPasswordField().setText(TEST_PASSWORD);
+                ui.getLoginButton().doClick();
+            });
+            Thread.sleep(200);
+        }
+    }
     
     
     

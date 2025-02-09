@@ -116,6 +116,118 @@ public class UIIntTest {
             assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
         });
     }
+    
+    @Test
+    @DisplayName("Should Handle Sequential Registration and Login")
+    void testSequentialRegistrationAndLogin() throws Exception {
+        User mockUser = new User(1, TEST_USERNAME, TEST_PASSWORD);
+        when(userServiceMock.registerUser(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
+        when(userServiceMock.login(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
+
+        // Register
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+        Thread.sleep(500);
+
+        // Login with same credentials
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getLoginButton().doClick();
+        });
+
+        verify(userServiceMock).registerUser(TEST_USERNAME, TEST_PASSWORD);
+        verify(userServiceMock).login(TEST_USERNAME, TEST_PASSWORD);
+    }
+    
+    @Test
+    @DisplayName("Should Handle Registration With Existing Username")
+    void testRegistrationWithExistingUsername() throws Exception {
+        when(userServiceMock.registerUser(TEST_USERNAME, TEST_PASSWORD))
+            .thenThrow(new IllegalArgumentException("Username already exists"));
+
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(TEST_USERNAME, ui.getUsernameField().getText());
+            assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
+        });
+    }
+    
+    @Test
+    @DisplayName("Should Handle UI Component State After Failed Operations")
+    void testUIComponentStateAfterFailedOperations() throws Exception {
+        when(userServiceMock.registerUser(anyString(), anyString()))
+            .thenThrow(new IllegalArgumentException("Registration failed"));
+
+        SwingUtilities.invokeAndWait(() -> {
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getRegisterButton().doClick();
+        });
+
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(ui.getRegisterButton().isEnabled());
+            assertTrue(ui.getLoginButton().isEnabled());
+            assertTrue(ui.getUsernameField().isEnabled());
+            assertTrue(ui.getPasswordField().isEnabled());
+        });
+    }
+    
+    @Test
+    @DisplayName("Should Handle Multiple Failed Login Attempts")
+    void testMultipleFailedLoginAttempts() throws Exception {
+        when(userServiceMock.login(anyString(), anyString()))
+            .thenThrow(new IllegalArgumentException("Invalid credentials"));
+
+        for (int i = 0; i < 3; i++) {
+            final String attempt = "attempt" + i;
+            SwingUtilities.invokeAndWait(() -> {
+                ui.getUsernameField().setText(attempt);
+                ui.getPasswordField().setText(TEST_PASSWORD);
+                ui.getLoginButton().doClick();
+            });
+            Thread.sleep(200);
+        }
+
+        verify(userServiceMock, times(3)).login(anyString(), anyString());
+    }
+    
+    @Test
+    @DisplayName("Should Handle TodoUI Launch With Different Screen Sizes")
+    void testTodoUILaunchWithDifferentScreenSizes() throws Exception {
+        User mockUser = new User(1, TEST_USERNAME, TEST_PASSWORD);
+        when(userServiceMock.login(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
+
+        SwingUtilities.invokeAndWait(() -> {
+            // Set different screen sizes
+            ui.setSize(800, 600);
+            ui.getUsernameField().setText(TEST_USERNAME);
+            ui.getPasswordField().setText(TEST_PASSWORD);
+            ui.getLoginButton().doClick();
+        });
+
+        Thread.sleep(500);
+
+        SwingUtilities.invokeAndWait(() -> {
+            boolean todoUIFound = false;
+            for (Frame frame : Frame.getFrames()) {
+                if (frame instanceof TodoUI) {
+                    todoUIFound = true;
+                    assertTrue(frame.isVisible());
+                    break;
+                }
+            }
+            assertTrue(todoUIFound);
+        });
+    }
 
 
     @AfterEach

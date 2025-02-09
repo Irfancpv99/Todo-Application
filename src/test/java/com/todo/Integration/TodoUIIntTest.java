@@ -8,10 +8,14 @@ import com.todo.service.*;
 
 import javax.swing.*;
 import java.awt.*;
+import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
+
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
@@ -342,6 +346,29 @@ class TodoUIIntTest
         }
     }
     
+    @Test
+    @DisplayName("Clear Fields Should Reset All Input Fields")
+    void testClearFields() {
+        // Set field values
+        var titleField = getPrivateField(todoUI, "titleField", JTextField.class);
+        var descriptionField = getPrivateField(todoUI, "descriptionField", JTextField.class);
+        var dateField = getPrivateField(todoUI, "dateField", JTextField.class);
+        
+        titleField.setText("Test Title");
+        descriptionField.setText("Test Description");
+        dateField.setText("2025-01-01");
+        
+        // Click clear button
+        findButtonByText(todoUI, "Clear").doClick();
+        
+        // Verify fields are cleared
+        assertTrue(titleField.getText().isEmpty(), "Title field should be empty");
+        assertTrue(descriptionField.getText().isEmpty(), "Description field should be empty");
+        assertTrue(dateField.getText().isEmpty(), "Date field should be empty");
+    }
+    
+    
+    
     private void addTestTodo(String title, String description, Priority priority, Tags tag) {
         try {
             SwingUtilities.invokeAndWait(() -> {
@@ -358,6 +385,8 @@ class TodoUIIntTest
             fail("Failed to add test todo: " + e.getMessage());
         }
     }
+    
+    
 
     private JButton findButton(String text) {
         return findButtonInContainer(todoUI, text);
@@ -403,4 +432,32 @@ class TodoUIIntTest
             return null;
         }
     }
+    
+    private <T> T getPrivateField(Object obj, String fieldName, Class<T> fieldType) {
+        try {
+            Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return fieldType.cast(field.get(obj));
+        } catch (Exception e) {
+            fail("Failed to get field: " + fieldName + ", error: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private JButton findButtonByText(Container container, String text) {
+        for (var comp : container.getComponents()) {
+            if (comp instanceof JButton button && text.equals(button.getText())) {
+                return button;
+            } else if (comp instanceof Container cont) {
+                var found = findButtonByText(cont, text);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+    
+    
+    
 }
