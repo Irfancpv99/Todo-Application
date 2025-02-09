@@ -35,6 +35,21 @@ public class UIe2eTest {
             ui = new UI(userService, todoService);
             ui.setVisible(true);
         });
+        Thread.sleep(500);
+    }
+    
+    @AfterEach
+    void tearDown() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+        	for (Frame frame : Frame.getFrames()) {
+                frame.dispose();
+            }
+        });
+        
+        try (Connection conn = DatabaseConfig.getConnection()) {
+            conn.createStatement().execute("DELETE FROM todos");
+            conn.createStatement().execute("DELETE FROM users");
+        }
     }
 
     @Test
@@ -50,6 +65,7 @@ public class UIe2eTest {
             assertTrue(ui.getUsernameField().getText().isEmpty(), "Username should clear after registration.");
             assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty(), "Password should clear after registration.");
         });
+        
     }
 
     @Test
@@ -205,7 +221,7 @@ public class UIe2eTest {
 
        
         SwingUtilities.invokeAndWait(() -> {
-            // First verify login UI is hidden
+         
             assertFalse(ui.isVisible(), "Login UI should not be visible after successful login");
             
        
@@ -337,14 +353,4 @@ public class UIe2eTest {
         });
     }
     
-   
-    
-    
-    
-    @AfterEach
-    void tearDown() throws Exception {
-        SwingUtilities.invokeAndWait(() -> {
-            if (ui != null) ui.dispose();
-        });
-    }
 }
