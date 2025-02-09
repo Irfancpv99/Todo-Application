@@ -1,27 +1,57 @@
 package com.todo.UnitTest;
 
 import com.todo.config.DatabaseConfig;
+import com.todo.config.PropertiesLoader;
+
 import org.junit.jupiter.api.*;
 
+import java.lang.reflect.Field;
 import java.sql.Connection;
-//import java.sql.SQLException;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DatabaseConfigTest {
 
+    private static Properties originalProperties;
+    private static Field propsField;
+
+    @BeforeAll
+    static void setUpClass() throws Exception {
+        // Store reference to properties field
+        propsField = PropertiesLoader.class.getDeclaredField("properties");
+        propsField.setAccessible(true);
+        
+        // Store original properties
+        originalProperties = new Properties();
+        Properties currentProps = (Properties) propsField.get(null);
+        originalProperties.putAll(currentProps);
+    }
+
     @BeforeEach
-    void setUp() {
-        // Clean setup - no mocking needed
+    void setUp() throws Exception {
+        // Reset database connection
         DatabaseConfig.closePool();
+        
+        // Reset properties to original state before each test
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(originalProperties);
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
         DatabaseConfig.closePool();
+        
+        // Restore original properties
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(originalProperties);
     }
 
     @Test
+    @Order(1)
     @DisplayName("Database initialization should succeed")
     void testSuccessfulInitialization() {
         assertDoesNotThrow(() -> {
@@ -32,8 +62,19 @@ class DatabaseConfigTest {
             }
         }, "Database initialization should not throw any exceptions");
     }
+    
+    @Test
+    @Order(2)
+    @DisplayName("Database Initialization failed")
+    void testInitializeFailure() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/nonexistentdb");
+        
+        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
+    }
 
     @Test
+    @Order(3)
     @DisplayName("Connection pool should reinitialize after closure")
     void testConnectionPoolReinitialization() {
         assertDoesNotThrow(() -> {
@@ -48,6 +89,7 @@ class DatabaseConfigTest {
     }
 
     @Test
+    @Order(4)
     @DisplayName("Multiple connections should be unique")
     void testMultipleConnectionRequests() {
         assertDoesNotThrow(() -> {
@@ -68,27 +110,35 @@ class DatabaseConfigTest {
     }
 
     @Test
+    @Order(5)
     @DisplayName("Connection pool should handle concurrent connections")
     void testConcurrentConnections() {
         assertDoesNotThrow(() -> {
             DatabaseConfig.initialize();
             var connections = new Connection[5];
             
-            // Get multiple connections concurrently
-            for (int i = 0; i < connections.length; i++) {
-                connections[i] = DatabaseConfig.getConnection();
-            }
-            
-            // Verify all connections
-            for (var conn : connections) {
-                assertNotNull(conn, "Connection should be valid");
-                assertFalse(conn.isClosed(), "Connection should be open");
-                conn.close();
+            try {
+                for (int i = 0; i < connections.length; i++) {
+                    connections[i] = DatabaseConfig.getConnection();
+                }
+                
+                for (var conn : connections) {
+                    assertNotNull(conn, "Connection should be valid");
+                    assertFalse(conn.isClosed(), "Connection should be open");
+                }
+            } finally {
+                // Ensure all connections are closed
+                for (var conn : connections) {
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
+                    }
+                }
             }
         }, "Should handle multiple concurrent connections");
     }
 
     @Test
+    @Order(6)
     @DisplayName("Close pool should handle null data source")
     void testClosePoolWithNullDataSource() {
         assertDoesNotThrow(() -> {

@@ -2,96 +2,187 @@ package com.todo.UnitTest;
 
 import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Properties;
+
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PropertiesLoaderTest {
     
+    private static Properties originalProperties;
+    private static Field propsField;
+    private final PrintStream standardOut = System.out;
+    private final ByteArrayOutputStream outputStreamCaptor = new ByteArrayOutputStream();
+    
+    @BeforeAll
+    static void setUpClass() throws Exception {
+        // Get access to the private properties field
+        propsField = PropertiesLoader.class.getDeclaredField("properties");
+        propsField.setAccessible(true);
+        
+        // Store original properties
+        originalProperties = new Properties();
+        Properties currentProps = (Properties) propsField.get(null);
+        originalProperties.putAll(currentProps);
+    }
+    
     @BeforeEach
-    void setUp() {
-        // Set known environment variables for testing
-        System.setProperty("DB_URL", "jdbc:postgresql://localhost:5432/todo_db");
-        System.setProperty("DB_USER", "postgres");
-        System.setProperty("DB_PASSWORD", "postgres");
+    void setUp() throws Exception {
+        // Reset properties to original state before each test
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(originalProperties);
+        
+        // Set up System.out capture
+        System.setOut(new PrintStream(outputStreamCaptor));
+        
+        // Set test environment variables
+        System.setProperty("TEST_DB_URL", "jdbc:postgresql://testhost:5432/testdb");
+        System.setProperty("TEST_DB_USER", "testuser");
+        System.setProperty("TEST_DB_PASSWORD", "testpass");
     }
-
+    
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
+        // Restore original properties
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(originalProperties);
+        
+        // Reset System.out
+        System.setOut(standardOut);
+        
         // Clear test environment variables
-        System.clearProperty("DB_URL");
-        System.clearProperty("DB_USER");
-        System.clearProperty("DB_PASSWORD");
+        System.clearProperty("TEST_DB_URL");
+        System.clearProperty("TEST_DB_USER");
+        System.clearProperty("TEST_DB_PASSWORD");
     }
 
     @Test
-    @DisplayName("Should get database URL property")
-    void testGetDatabaseUrl() {
-        String dbUrl = PropertiesLoader.getProperty("db.url");
-        assertNotNull(dbUrl, "Database URL should not be null");
-        assertTrue(dbUrl.contains("postgresql"), "Database URL should be a PostgreSQL URL");
+    @Order(2)
+    @DisplayName("Should use default values when environment variables are missing")
+    void testEnvironmentVariableDefaults() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.missing", "${NONEXISTENT_VAR:default_value}");
+
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+
+        // Force resolution
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+
+        assertEquals("default_value", PropertiesLoader.getProperty("test.missing"));
     }
 
     @Test
-    @DisplayName("Should get database username property")
-    void testGetDatabaseUsername() {
-        String username = PropertiesLoader.getProperty("db.username");
-        assertNotNull(username, "Database username should not be null");
-        assertFalse(username.isEmpty(), "Database username should not be empty");
+    @Order(3)
+    @DisplayName("Should handle properties without environment variables")
+    void testPlainProperties() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.plain", "plain_value");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        assertEquals("plain_value", PropertiesLoader.getProperty("test.plain"));
     }
 
     @Test
-    @DisplayName("Should get database password property")
-    void testGetDatabasePassword() {
-        String password = PropertiesLoader.getProperty("db.password");
-        assertNotNull(password, "Database password should not be null");
-        assertFalse(password.isEmpty(), "Database password should not be empty");
-    }
-
-    @Test
+    @Order(4)
     @DisplayName("Should get integer property with default value")
     void testGetIntegerProperty() {
-        int maxSize = PropertiesLoader.getIntProperty("db.pool.maxSize", 10);
-        int minIdle = PropertiesLoader.getIntProperty("db.pool.minIdle", 2);
-        int idleTimeout = PropertiesLoader.getIntProperty("db.pool.idleTimeout", 300000);
+        int defaultValue = 42;
+        int value = PropertiesLoader.getIntProperty("test.integer", defaultValue);
+        assertEquals(defaultValue, value);
         
-        assertAll("Pool configuration properties",
-            () -> assertTrue(maxSize > 0, "Max pool size should be positive"),
-            () -> assertTrue(minIdle > 0, "Min idle connections should be positive"),
-            () -> assertTrue(idleTimeout > 0, "Idle timeout should be positive")
+        // Test with existing property
+        Properties properties;
+        try {
+            properties = (Properties) propsField.get(null);
+            properties.setProperty("test.integer", "100");
+            assertEquals(100, PropertiesLoader.getIntProperty("test.integer", defaultValue));
+        } catch (Exception e) {
+            fail("Failed to set test property");
+        }
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("Should handle invalid integer properties")
+    void testInvalidIntegerProperty() {
+        Properties properties;
+        try {
+            properties = (Properties) propsField.get(null);
+            properties.setProperty("test.invalid.int", "not_a_number");
+            
+            assertThrows(NumberFormatException.class, () -> 
+                PropertiesLoader.getIntProperty("test.invalid.int", 42)
+            );
+        } catch (Exception e) {
+            fail("Failed to set test property");
+        }
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("Should print properties correctly")
+    void testPrintProperties() {
+        Properties properties;
+        try {
+            properties = (Properties) propsField.get(null);
+            properties.setProperty("test.print", "print_value");
+            
+            PropertiesLoader.printProperties();
+            
+            String printedOutput = outputStreamCaptor.toString();
+            assertTrue(printedOutput.contains("Loaded Properties:"));
+            assertTrue(printedOutput.contains("test.print = print_value"));
+        } catch (Exception e) {
+            fail("Failed to set test property");
+        }
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("Should throw exception for missing required properties")
+    void testMissingRequiredProperties() {
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> PropertiesLoader.getProperty("non.existent.property")
+        );
+        
+        assertTrue(exception.getMessage().contains("not found in application.properties"));
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("Should handle missing properties with defaults")
+    void testMissingPropertiesWithDefaults() {
+        String defaultValue = "default";
+        assertEquals(defaultValue, 
+            PropertiesLoader.getProperty("non.existent.property", defaultValue)
         );
     }
 
     @Test
-    @DisplayName("Should handle missing properties with default values")
-    void testMissingPropertiesWithDefaults() {
-        String defaultValue = "default";
-        String value = PropertiesLoader.getProperty("non.existent.property", defaultValue);
-        assertEquals(defaultValue, value, "Should return default value for missing property");
-    }
-
-    @Test
-    @DisplayName("Should throw exception for missing required properties")
-    void testMissingRequiredProperties() {
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            PropertiesLoader.getProperty("non.existent.property");
-        });
+    @Order(9)
+    @DisplayName("Should handle environment variables without defaults")
+    void testEnvironmentVariablesWithoutDefaults() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.nodefault", "${NONEXISTENT_VAR}");
         
-        assertTrue(exception.getMessage().contains("not found"),
-            "Exception message should indicate property not found");
-    }
-
-    @Test
-    @DisplayName("Should print properties without exception")
-    void testPrintProperties() {
-        assertDoesNotThrow(() -> {
-            PropertiesLoader.printProperties();
-        }, "Printing properties should not throw exception");
-    }
-
-    @Test
-    @DisplayName("Should handle invalid integer properties")
-    void testInvalidIntegerProperty() {
-        int defaultValue = 42;
-        int value = PropertiesLoader.getIntProperty("non.existent.int", defaultValue);
-        assertEquals(defaultValue, value, "Should return default value for missing integer property");
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        // Should keep original value when env var doesn't exist and no default is provided
+        assertEquals("${NONEXISTENT_VAR}", PropertiesLoader.getProperty("test.nodefault"));
     }
 }

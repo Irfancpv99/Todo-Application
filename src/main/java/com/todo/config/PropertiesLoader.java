@@ -24,11 +24,18 @@ public class PropertiesLoader {
         properties.forEach((key, value) -> {
             String stringValue = value.toString();
             if (stringValue.startsWith("${") && stringValue.endsWith("}")) {
-                // Parse the environment variable name and default value
+                // Extract environment variable name and default value
                 String envVarFull = stringValue.substring(2, stringValue.length() - 1);
-                String[] parts = envVarFull.split("(?<!\\\\):", 2);
-                String envVar = parts[0];
-                String defaultValue = parts.length > 1 ? parts[1] : null;
+                
+                // Replace escaped colons (\:) with a placeholder
+                String tempString = envVarFull.replace("\\:", "[COLON]");
+                
+                // Now split safely
+                String[] parts = tempString.contains(":") ? tempString.split(":", 2) : new String[]{tempString};
+                
+                // Restore colons in the default value
+                String envVar = parts[0].replace("[COLON]", ":");
+                String defaultValue = parts.length > 1 ? parts[1].replace("[COLON]", ":") : null;
                 
                 // Get environment variable value or use default
                 String envValue = System.getenv(envVar);
