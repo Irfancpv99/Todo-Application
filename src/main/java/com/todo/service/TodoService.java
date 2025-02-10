@@ -18,7 +18,11 @@ public class TodoService {
 	private int nextUserSpecificId = 1;
 
 	public Todo createTodo(int userSpecificId, int userId, String title, String description, LocalDate dueDate, Priority priority, Tags tag) {
-	    try (Connection conn = DatabaseConfig.getConnection()) {
+		if (tag == null) {
+	        throw new IllegalArgumentException("Tag cannot be null");
+	    }
+		
+		try (Connection conn = DatabaseConfig.getConnection()) {
 	        conn.setAutoCommit(false);
 	        try {
 	            try (PreparedStatement ps = conn.prepareStatement(

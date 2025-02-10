@@ -294,4 +294,13 @@ class UserServiceIntTest {
         UserService newUserService = new UserService();
         assertTrue(newUserService.isUsernameTaken(username));
     }
+    
+    @Test
+    @DisplayName("Test SQL Exception Handling in Username Check")
+    void testSQLExceptionInUsernameCheck() {
+        // Simulate DB error during username check
+        assertThrows(RuntimeException.class, () -> {
+            userService.isUsernameTaken("'); DROP TABLE users; --");
+        });
+    }
 }

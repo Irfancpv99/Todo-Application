@@ -1,6 +1,5 @@
 package com.todo.Integration;
 
-//import com.todo.model.Todo;
 import com.todo.model.Priority;
 import com.todo.model.Status;
 import com.todo.model.Tags;
@@ -12,7 +11,6 @@ import com.todo.config.DatabaseConfig;
 import org.junit.jupiter.api.*;
 import java.time.LocalDate;
 import java.util.List;
-//import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -45,11 +43,10 @@ class TodoServiceIntTest {
     private void setupTestDatabase() {
         try (Connection conn = DatabaseConfig.getConnection();
              Statement stmt = conn.createStatement()) {
-            // Clean existing data
+
             stmt.execute("DELETE FROM todos");
             stmt.execute("DELETE FROM users CASCADE");
-            
-            // Create test user and store the ID
+
             var user = userService.registerUser(TEST_USERNAME, TEST_PASSWORD);
             userId = user.getUserid();
         } catch (Exception e) {
@@ -80,14 +77,12 @@ class TodoServiceIntTest {
             Tags.Work
         );
 
-        // Test immediate retrieval
         var retrievedTodo = todoService.getTodoById(createdTodo.getId());
         assertNotNull(retrievedTodo);
         assertEquals("Task 1", retrievedTodo.getTitle());
         assertEquals(Tags.Work, retrievedTodo.getTags());
         assertEquals(Priority.MEDIUM, retrievedTodo.getPriority());
-        
-        // Test retrieval in a new service instance to verify persistence
+
         var newTodoService = new TodoService();
         var persistedTodo = newTodoService.getTodoById(createdTodo.getId());
         assertNotNull(persistedTodo);
@@ -140,7 +135,6 @@ class TodoServiceIntTest {
             Tags.Urgent
         );
 
-        // Update only title and priority
         var updatedTodo = todoService.updateTodo(
             todo.getId(),
             userId,
@@ -175,7 +169,6 @@ class TodoServiceIntTest {
         boolean deleted = todoService.deleteTodoById(todo.getId());
         assertTrue(deleted);
 
-        // Verify deletion using a new service instance
         var newTodoService = new TodoService();
         var deletedTodo = newTodoService.getTodoById(todo.getId());
         assertNull(deletedTodo);
@@ -184,7 +177,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Get All Todos for User with Multiple Service Instances")
     void testGetAllTodos() {
-        // Create todos with first service instance
+
         todoService.createTodo(
             1,
             userId,
@@ -205,7 +198,6 @@ class TodoServiceIntTest {
             Tags.Urgent
         );
 
-        // Verify with new service instance
         var newTodoService = new TodoService();
         var allTodos = newTodoService.getTodosByUserId(userId);
         assertEquals(2, allTodos.size());
@@ -216,7 +208,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Error Handling and Database Constraints")
     void testErrorHandling() {
-        // Test updating non-existent todo
+
         assertThrows(NoSuchElementException.class, () ->
             todoService.updateTodo(
                 999,
@@ -230,17 +222,14 @@ class TodoServiceIntTest {
             )
         );
 
-        // Test deleting non-existent todo
         assertFalse(todoService.deleteTodoById(999));
 
-        // Test getting non-existent todo
         assertNull(todoService.getTodoById(999));
     }
 
     @Test
     @DisplayName("Database Connection and Transaction Management")
     void testDatabaseTransactions() {
-        // Test successful transaction
         var todo = todoService.createTodo(
             1,
             userId,
@@ -251,8 +240,7 @@ class TodoServiceIntTest {
             Tags.Work
         );
         assertNotNull(todo);
-        
-        // Verify persistence
+ 
         var retrievedTodo = todoService.getTodoById(todo.getId());
         assertNotNull(retrievedTodo);
         assertEquals("Transaction Test", retrievedTodo.getTitle());
@@ -261,7 +249,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Transaction Rollback on Failed Todo Creation")
     void testTransactionRollbackOnFailure() {
-        // Attempt to create todo with non-existent user
+
         int nonExistentUserId = 99999;
         assertThrows(RuntimeException.class, () -> {
             todoService.createTodo(
@@ -274,8 +262,7 @@ class TodoServiceIntTest {
                 Tags.Work
             );
         });
-        
-        // Verify no todos were created
+
         var todos = todoService.getTodosByUserId(nonExistentUserId);
         assertTrue(todos.isEmpty());
     }
@@ -311,12 +298,10 @@ class TodoServiceIntTest {
 
         latch.await(5, TimeUnit.SECONDS);
         assertEquals(numThreads, successCount.get());
-        
-        // Verify all todos were created
+
         var allTodos = todoService.getTodosByUserId(userId);
         assertEquals(numThreads, allTodos.size());
-        
-        // Verify each todo can be retrieved individually
+
         createdTodos.forEach((index, todo) -> {
             var retrievedTodo = todoService.getTodoById(todo.getId());
             assertNotNull(retrievedTodo);
@@ -337,8 +322,7 @@ class TodoServiceIntTest {
             Priority.LOW,
             Tags.Work
         );
-        
-        // Test multiple status transitions
+
         todo = todoService.updateTodo(
             todo.getId(),
             userId,
@@ -367,7 +351,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("User-Specific ID Management")
     void testUserSpecificIdManagement() {
-        // Create first todo
+
         todoService.setNextUserSpecificId(1);
         Todo todo1 = todoService.createTodo(
             todoService.getNextUserSpecificId(),
@@ -378,8 +362,7 @@ class TodoServiceIntTest {
             Priority.LOW,
             Tags.Work
         );
-        
-        // Create second todo
+
         Todo todo2 = todoService.createTodo(
             todoService.getNextUserSpecificId(),
             userId,
@@ -390,11 +373,9 @@ class TodoServiceIntTest {
             Tags.Home
         );
 
-        // Verify todos were created
         List<Todo> todos = todoService.getTodosByUserId(userId);
         assertEquals(2, todos.size());
 
-        // Verify specific todos exist and can be retrieved
         Todo retrievedTodo1 = todoService.getTodoById(todo1.getId());
         Todo retrievedTodo2 = todoService.getTodoById(todo2.getId());
         
@@ -402,8 +383,7 @@ class TodoServiceIntTest {
         assertNotNull(retrievedTodo2, "Second todo should exist");
         assertEquals("Task 1", retrievedTodo1.getTitle());
         assertEquals("Task 2", retrievedTodo2.getTitle());
-        
-        // Now test with a new service instance
+
         TodoService newTodoService = new TodoService();
         newTodoService.setNextUserSpecificId(3);
         
@@ -417,7 +397,6 @@ class TodoServiceIntTest {
             Tags.Urgent
         );
 
-        // Verify all todos exist
         List<Todo> allTodos = todoService.getTodosByUserId(userId);
         assertEquals(3, allTodos.size(), "Should have all three todos");
         
@@ -457,12 +436,10 @@ class TodoServiceIntTest {
             Tags.Work
         );
         assertNotNull(todo);
-
-        // Test rollback with invalid userId
         assertThrows(RuntimeException.class, () -> {
             todoService.createTodo(
                 2,
-                -999, // Invalid user ID to force foreign key constraint violation
+                -999, 
                 "Invalid Todo",
                 "Description",
                 LocalDate.now(),
@@ -470,8 +447,6 @@ class TodoServiceIntTest {
                 Tags.Work
             );
         });
-
-        // Verify the successful todo still exists
         Todo retrievedTodo = todoService.getTodoById(todo.getId());
         assertNotNull(retrievedTodo);
         assertEquals("Valid Todo", retrievedTodo.getTitle());
@@ -533,5 +508,55 @@ class TodoServiceIntTest {
         );
         assertFalse(todo.isCompleted());
         assertEquals(Status.PENDING, todo.getStatus());
+    }
+    
+    @Test
+    @DisplayName("Test Todo Creation with Invalid Tags")
+    void testCreateTodoWithInvalidTags() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            todoService.createTodo(
+                1,
+                userId,
+                "Test Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                null
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Update Todo Status Edge Cases")
+    void testUpdateTodoStatusEdgeCases() {
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Status Test",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        for(int i = 0; i < 5; i++) {
+            todo = todoService.updateTodo(
+                todo.getId(),
+                userId,
+                todo.getTitle(),
+                todo.getDescription(),
+                todo.getDueDate(),
+                todo.getPriority(),
+                todo.getTags(),
+                i % 2 == 0
+            );
+            assertEquals(i % 2 == 0, todo.isCompleted());
+        }
+    }
+    
+    @Test
+    @DisplayName("Test Get Todos With Invalid User ID")
+    void testGetTodosInvalidUser() {
+        List<Todo> todos = todoService.getTodosByUserId(-1);
+        assertTrue(todos.isEmpty());
     }
 }
