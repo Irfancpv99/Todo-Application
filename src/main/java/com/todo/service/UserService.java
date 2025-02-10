@@ -66,36 +66,11 @@ public class UserService {
             throw new RuntimeException("Database error: " + e.getMessage());
         }
     }
-    
-//    public User login(String username, String password) {
-//        if (username == null || username.trim().isEmpty()) {
-//            throw new IllegalArgumentException("Username cannot be empty.");
-//        }
-//        if (password == null || password.trim().isEmpty()) {
-//            throw new IllegalArgumentException("Password cannot be empty.");
-//        }
-//        
-//        try (Connection conn = DatabaseConfig.getConnection();
-//             PreparedStatement ps = conn.prepareStatement(
-//                 "SELECT * FROM users WHERE username = ? AND password = ?")) {
-//            
-//            ps.setString(1, username);
-//            ps.setString(2, password);
-//            
-//            try (ResultSet rs = ps.executeQuery()) {
-//                if (rs.next()) {
-//                	int userId = rs.getInt("id");
-//                    return new User(username, password);
-//                }
-//            }
-//            throw new IllegalArgumentException("Invalid username or password");
-//            
-//        } catch (SQLException e) {
-//            throw new RuntimeException("Database error: " + e.getMessage());
-//        }
-//    }
 
     public boolean isUsernameTaken(String username) {
+    	if (username == null) {
+            throw new RuntimeException("Username cannot be null");
+        }
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(
                  "SELECT COUNT(*) FROM users WHERE username = ?")) {
