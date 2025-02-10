@@ -2,6 +2,8 @@ package com.todo.ConfigTest;
 
 import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
+
+
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -265,4 +267,46 @@ class PropertiesLoaderTest {
         
         assertEquals("default", PropertiesLoader.getProperty("test.env"));
     }
-}
+    
+    @Test
+    @Order(15)
+    @DisplayName("Should handle empty properties file")
+    void testEmptyPropertiesFile() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        assertThrows(RuntimeException.class, () -> 
+            PropertiesLoader.getProperty("any.property"));
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("Should handle empty environment variable name")
+    void testEmptyEnvironmentVariableName() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.empty.env", "${}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        assertEquals("${}", PropertiesLoader.getProperty("test.empty.env"));
+    }
+    
+    @Test
+    @Order(17)
+    @DisplayName("Should handle multiple colons in default value")
+    void testMultipleColonsInDefault() throws Exception {
+
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("test.multicolon", "${TEST_VAR:http\\://example.com\\:8080/path}");
+    
+        resolveMethod.invoke(null);
+        
+        String result = PropertiesLoader.getProperty("test.multicolon");
+        assertEquals("http://example.com:8080/path", result);
+    }
+
+    }

@@ -209,6 +209,17 @@ class DatabaseConfigTest {
         
         assertThrows(IllegalArgumentException.class, () -> DatabaseConfig.initialize());
     }
+    
+    @Test
+    @Order(14)
+    @DisplayName("Should handle null datasource in getConnection")
+    void testNullDataSource() throws Exception {
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        dataSourceField.set(null, null);
+        
+        assertDoesNotThrow(() -> DatabaseConfig.getConnection());
+    }
 
    
 }
