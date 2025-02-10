@@ -1,4 +1,4 @@
-package com.todo.UnitTest;
+package com.todo.ConfigTest;
 
 import com.todo.config.DatabaseConfig;
 import com.todo.config.PropertiesLoader;
@@ -7,6 +7,7 @@ import org.junit.jupiter.api.*;
 
 import java.lang.reflect.Field;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -145,5 +146,39 @@ class DatabaseConfigTest {
             DatabaseConfig.closePool();
             DatabaseConfig.closePool(); // Second call should not throw exception
         }, "Closing pool multiple times should not throw exception");
+    }
+    
+    @Test 
+    @Order(7)
+    @DisplayName("Should handle database URL retrieval")
+    void testGetDbUrl() {
+        String properties = PropertiesLoader.getProperty("db.url", "jdbc:postgresql://localhost:5432/testdb");
+        assertNotNull(properties);
+    }
+    
+    @Test
+    @Order(8) 
+    @DisplayName("Should handle database username retrieval")
+    void testGetDbUsername() {
+        String properties = PropertiesLoader.getProperty("db.username", "test_user");
+        assertNotNull(properties);
+    }
+    
+    @Test
+    @Order(9)
+    @DisplayName("Should handle database password retrieval")
+    void testGetDbPassword() {
+        String properties = PropertiesLoader.getProperty("db.password", "test_pass");
+        assertNotNull(properties);
+    }
+    
+    @Test
+    @Order(10)
+    @DisplayName("Should handle connection close")
+    void testConnectionClose() throws SQLException {
+        DatabaseConfig.initialize();
+        Connection conn = DatabaseConfig.getConnection();
+        conn.close();
+        assertTrue(conn.isClosed());
     }
 }

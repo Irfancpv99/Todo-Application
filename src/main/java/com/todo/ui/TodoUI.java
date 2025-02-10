@@ -1,6 +1,7 @@
 package com.todo.ui;
-
-import com.todo.model.*;
+import com.todo.model.Priority;
+import com.todo.model.Tags;
+import com.todo.model.Todo;
 import com.todo.service.*;
 
 import javax.swing.*;

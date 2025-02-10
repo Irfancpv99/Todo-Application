@@ -1,8 +1,9 @@
-package com.todo.UnitTest;
+package com.todo.ConfigTest;
 
 import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -184,5 +185,56 @@ class PropertiesLoaderTest {
         
         // Should keep original value when env var doesn't exist and no default is provided
         assertEquals("${NONEXISTENT_VAR}", PropertiesLoader.getProperty("test.nodefault"));
+    }
+    
+    @Test
+    @Order(10)
+    @DisplayName("Should handle escaped colons in environment variables")
+    void testEscapedColons() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.escaped", "${TEST_VAR:value\\:with\\:colons}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        
+        
+        properties.putAll(testProps);
+
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+
+        assertEquals("value:with:colons", PropertiesLoader.getProperty("test.escaped"));
+    }
+    
+    @Test
+    @Order(11)
+    @DisplayName("Should handle environment variables with empty default values")
+    void testEmptyDefaultValues() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.empty.default", "${NONEXISTENT_VAR:}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+
+        assertEquals("", PropertiesLoader.getProperty("test.empty.default"));
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("Should handle properties file not found")
+    void testPropertiesFileNotFound() {
+        assertThrows(RuntimeException.class, () -> {
+            try (InputStream input = PropertiesLoader.class.getClassLoader()
+                    .getResourceAsStream("nonexistent.properties")) {
+                Properties props = new Properties();
+                props.load(input);
+            }
+        });
     }
 }

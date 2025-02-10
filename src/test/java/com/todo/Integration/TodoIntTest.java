@@ -3,10 +3,13 @@ package com.todo.Integration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import com.todo.model.Priority;
+import com.todo.model.Status;
+import com.todo.model.Tags;
+import com.todo.model.Todo;
+
 import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.*;
-
-import com.todo.model.*;
 
 class TodoIntTest {
     private LocalDate dueDate;

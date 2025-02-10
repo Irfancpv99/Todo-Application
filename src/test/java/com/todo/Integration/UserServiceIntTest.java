@@ -26,7 +26,7 @@ class UserServiceIntTest {
     @DisplayName("Register and Login Flow")
     void testRegisterAndLoginFlow() {
     	
-        // Register user
+        
         
     	User registeredUser = userService.registerUser(TEST_USERNAME, TEST_PASSWORD);
         assertNotNull(registeredUser);
@@ -280,17 +280,17 @@ class UserServiceIntTest {
     void testUsernameAvailabilityCheck() {
         String username = "availabilityuser";
         
-        // Initially username should not be taken
+       
         assertFalse(userService.isUsernameTaken(username));
 
-        // Register user
+       
         User user = userService.registerUser(username, "password123");
         assertNotNull(user);
 
-        // Now username should be taken
+       
         assertTrue(userService.isUsernameTaken(username));
 
-        // Check with a new service instance
+        
         UserService newUserService = new UserService();
         assertTrue(newUserService.isUsernameTaken(username));
     }
@@ -300,6 +300,14 @@ class UserServiceIntTest {
     void testSQLExceptionInUsernameCheck() {
         assertThrows(RuntimeException.class, () -> 
             userService.isUsernameTaken(null)
+        );
+    }
+    
+    @Test
+    @DisplayName("Test Generated Keys Failure")
+    void testGeneratedKeysFailure() {
+        assertThrows(RuntimeException.class, () ->
+            userService.registerUser("a".repeat(300), "pass")
         );
     }
 }

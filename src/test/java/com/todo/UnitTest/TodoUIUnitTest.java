@@ -1,7 +1,8 @@
 package com.todo.UnitTest;
 
-import com.todo.model.*;
+import com.todo.model.Priority;
 import com.todo.model.Tags;
+import com.todo.model.Todo;
 import com.todo.service.TodoService;
 import com.todo.ui.TodoUI;
 
