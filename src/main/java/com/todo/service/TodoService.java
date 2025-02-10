@@ -21,6 +21,12 @@ public class TodoService {
 		if (tag == null) {
 	        throw new IllegalArgumentException("Tag cannot be null");
 	    }
+		if (priority == null) {
+	        throw new IllegalArgumentException("Priority cannot be null");
+	    }
+		if (dueDate == null) {
+	        throw new IllegalArgumentException("DueDate cannot be null");
+	    }
 		
 		try (Connection conn = DatabaseConfig.getConnection()) {
 	        conn.setAutoCommit(false);

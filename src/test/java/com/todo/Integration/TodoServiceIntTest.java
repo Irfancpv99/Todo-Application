@@ -399,8 +399,7 @@ class TodoServiceIntTest {
 
         List<Todo> allTodos = todoService.getTodosByUserId(userId);
         assertEquals(3, allTodos.size(), "Should have all three todos");
-        
-        // Verify we can find all three tasks by their titles
+      
         boolean foundTask1 = false, foundTask2 = false, foundTask3 = false;
         
         for (Todo todo : allTodos) {
@@ -527,6 +526,58 @@ class TodoServiceIntTest {
     }
     
     @Test
+    @DisplayName("Test Todo Creation with Invalid Tags")
+    void testCreateTodoWithInvalidPriority() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            todoService.createTodo(
+                1,
+                userId,
+                "Test Todo",
+                "Description",
+                LocalDate.now(),
+                null,
+                Tags.Urgent
+                
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Todo Creation with Invalid Due Date")
+    void testCreateTodoWithInvalidDueDate() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            todoService.createTodo(
+                1,
+                userId,
+                "Test Todo",
+                "Description",
+                null,
+                Priority.MEDIUM,
+                Tags.Urgent
+                
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Todo Creation Title Validation")
+    void testTodoCreationTitleValidation() {
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "", "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+    }
+    
+    @Test
+    @DisplayName("Test Todo Creation Description Validation")
+    void testTodoCreationDescriptionValidation() {
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", "", 
+                LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+    }
+    
+    @Test
     @DisplayName("Test Update Todo Status Edge Cases")
     void testUpdateTodoStatusEdgeCases() {
         Todo todo = todoService.createTodo(
@@ -538,6 +589,7 @@ class TodoServiceIntTest {
             Priority.LOW,
             Tags.Work
         );
+        
         for(int i = 0; i < 5; i++) {
             todo = todoService.updateTodo(
                 todo.getId(),
@@ -558,5 +610,14 @@ class TodoServiceIntTest {
     void testGetTodosInvalidUser() {
         List<Todo> todos = todoService.getTodosByUserId(-1);
         assertTrue(todos.isEmpty());
+    }
+    
+    @Test
+    @DisplayName("Test Update Non-Existent Todo Status")
+    void testUpdateNonExistentTodoStatus() {
+        assertThrows(NoSuchElementException.class, () ->
+            todoService.updateTodo(99999, userId, "Title", "Desc",
+                LocalDate.now(), Priority.HIGH, Tags.Work, true)
+        );
     }
 }

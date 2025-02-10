@@ -139,38 +139,6 @@ class TodoServiceUniTest {
         assertTrue(todos.isEmpty());
     }
     
-//    @Test
-//    @DisplayName("Test Todo Creation with Edge Cases")
-//    void testCreateTodoEdgeCases() {
-//        // Test with minimum valid data
-//        Todo todo = todoService.createTodo(
-//            1,
-//            TEST_USER_ID,
-//            "Title",
-//            "", // Empty description
-//            LocalDate.now(),
-//            Priority.LOW,
-//            Tags.Work
-//        );
-//        assertNotNull(todo);
-//        assertEquals("", todo.getDescription());
-//
-//        // Test with future date
-//        LocalDate futureDate = LocalDate.now().plusYears(1);
-//        Todo futureTodo = todoService.createTodo(
-//            2,
-//            TEST_USER_ID,
-//            "Future Todo",
-//            "Description",
-//            futureDate,
-//            Priority.HIGH,
-//            Tags.Urgent
-//        );
-//        assertNotNull(futureTodo);
-//        assertEquals(futureDate, futureTodo.getDueDate());
-//    }
-
-    
     @Test
     @DisplayName("Delete Todo")
     void testDeleteTodo() {
@@ -218,4 +186,6 @@ class TodoServiceUniTest {
         boolean result = todoService.deleteTodoById(999);
         assertFalse(result);
     }
+    
+    
 }
