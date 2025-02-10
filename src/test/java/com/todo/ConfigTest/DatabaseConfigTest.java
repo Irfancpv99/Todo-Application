@@ -23,8 +23,7 @@ class DatabaseConfigTest {
         // Store reference to properties field
         propsField = PropertiesLoader.class.getDeclaredField("properties");
         propsField.setAccessible(true);
-        
-        // Store original properties
+ 
         originalProperties = new Properties();
         Properties currentProps = (Properties) propsField.get(null);
         originalProperties.putAll(currentProps);
@@ -32,10 +31,9 @@ class DatabaseConfigTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // Reset database connection
+  
         DatabaseConfig.closePool();
-        
-        // Reset properties to original state before each test
+
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
@@ -44,8 +42,7 @@ class DatabaseConfigTest {
     @AfterEach
     void tearDown() throws Exception {
         DatabaseConfig.closePool();
-        
-        // Restore original properties
+
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
@@ -128,7 +125,7 @@ class DatabaseConfigTest {
                     assertFalse(conn.isClosed(), "Connection should be open");
                 }
             } finally {
-                // Ensure all connections are closed
+
                 for (var conn : connections) {
                     if (conn != null && !conn.isClosed()) {
                         conn.close();
@@ -144,7 +141,7 @@ class DatabaseConfigTest {
     void testClosePoolWithNullDataSource() {
         assertDoesNotThrow(() -> {
             DatabaseConfig.closePool();
-            DatabaseConfig.closePool(); // Second call should not throw exception
+            DatabaseConfig.closePool();
         }, "Closing pool multiple times should not throw exception");
     }
     
@@ -181,4 +178,37 @@ class DatabaseConfigTest {
         conn.close();
         assertTrue(conn.isClosed());
     }
+    
+    @Test
+    @Order(11)
+    @DisplayName("Should handle initialization with invalid pool settings")
+    void testInvalidPoolSettings() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.pool.maxSize", "invalid");
+        
+        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("Should handle connection timeout")
+    void testConnectionTimeout() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.pool.connectionTimeout", "250"); // Minimum allowed timeout
+        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/db");
+        
+        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
+    }
+    
+    @Test
+    @Order(13)
+    @DisplayName("Should handle database initialization with invalid pool max size")
+    void testInvalidPoolMaxSize() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.pool.maxSize", "-1");
+        
+        assertThrows(IllegalArgumentException.class, () -> DatabaseConfig.initialize());
+    }
+
+   
 }

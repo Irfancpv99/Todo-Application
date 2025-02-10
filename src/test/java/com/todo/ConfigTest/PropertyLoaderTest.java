@@ -21,11 +21,10 @@ class PropertiesLoaderTest {
     
     @BeforeAll
     static void setUpClass() throws Exception {
-        // Get access to the private properties field
+
         propsField = PropertiesLoader.class.getDeclaredField("properties");
         propsField.setAccessible(true);
         
-        // Store original properties
         originalProperties = new Properties();
         Properties currentProps = (Properties) propsField.get(null);
         originalProperties.putAll(currentProps);
@@ -33,15 +32,13 @@ class PropertiesLoaderTest {
     
     @BeforeEach
     void setUp() throws Exception {
-        // Reset properties to original state before each test
+
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
-        
-        // Set up System.out capture
+ 
         System.setOut(new PrintStream(outputStreamCaptor));
-        
-        // Set test environment variables
+
         System.setProperty("TEST_DB_URL", "jdbc:postgresql://testhost:5432/testdb");
         System.setProperty("TEST_DB_USER", "testuser");
         System.setProperty("TEST_DB_PASSWORD", "testpass");
@@ -49,15 +46,13 @@ class PropertiesLoaderTest {
     
     @AfterEach
     void tearDown() throws Exception {
-        // Restore original properties
+
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
-        
-        // Reset System.out
+
         System.setOut(standardOut);
-        
-        // Clear test environment variables
+    
         System.clearProperty("TEST_DB_URL");
         System.clearProperty("TEST_DB_USER");
         System.clearProperty("TEST_DB_PASSWORD");
@@ -74,7 +69,6 @@ class PropertiesLoaderTest {
         properties.clear();
         properties.putAll(testProps);
 
-        // Force resolution
         Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
         resolveMethod.setAccessible(true);
         resolveMethod.invoke(null);
@@ -103,8 +97,7 @@ class PropertiesLoaderTest {
         int defaultValue = 42;
         int value = PropertiesLoader.getIntProperty("test.integer", defaultValue);
         assertEquals(defaultValue, value);
-        
-        // Test with existing property
+  
         Properties properties;
         try {
             properties = (Properties) propsField.get(null);
@@ -183,7 +176,6 @@ class PropertiesLoaderTest {
         properties.clear();
         properties.putAll(testProps);
         
-        // Should keep original value when env var doesn't exist and no default is provided
         assertEquals("${NONEXISTENT_VAR}", PropertiesLoader.getProperty("test.nodefault"));
     }
     
@@ -236,5 +228,41 @@ class PropertiesLoaderTest {
                 props.load(input);
             }
         });
+    }
+    
+    @Test
+    @Order(13)
+    @DisplayName("Should handle malformed environment variable syntax")
+    void testMalformedEnvironmentVariable() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.malformed", "${TEST_VAR");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        
+        assertEquals("${TEST_VAR", PropertiesLoader.getProperty("test.malformed"));
+    }
+    
+    @Test
+    @Order(14)
+    @DisplayName("Should handle single environment variable with value")
+    void testSingleEnvironmentVariable() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.env", "${TEST_ENV_VAR:default}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        
+        assertEquals("default", PropertiesLoader.getProperty("test.env"));
     }
 }
