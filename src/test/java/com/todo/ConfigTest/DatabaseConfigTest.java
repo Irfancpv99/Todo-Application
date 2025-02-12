@@ -2,9 +2,13 @@ package com.todo.ConfigTest;
 
 import com.todo.config.DatabaseConfig;
 import com.todo.config.PropertiesLoader;
+//import com.zaxxer.hikari.HikariDataSource;
 
+//import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 
+//import java.io.ByteArrayOutputStream;
+//import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -220,6 +224,54 @@ class DatabaseConfigTest {
         
         assertDoesNotThrow(() -> DatabaseConfig.getConnection());
     }
-
-   
+    
+//    @Test
+//    @Order(15)
+//    @DisplayName("Flyway migration failure throws exception")
+//    void testFlywayMigrationFailure() throws Exception {
+//        // Override Flyway locations to an invalid path
+//        Properties properties = (Properties) propsField.get(null);
+//        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/testdb");
+//        properties.setProperty("db.username", "test");
+//        properties.setProperty("db.password", "test");
+//
+//        // Use reflection to override Flyway configuration
+//        DatabaseConfig.initialize();
+//        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+//        dataSourceField.setAccessible(true);
+//        HikariDataSource dataSource = (HikariDataSource) dataSourceField.get(null);
+//
+//        Flyway flyway = Flyway.configure()
+//            .dataSource(dataSource)
+//            .locations("classpath:invalid/migration/path") // Invalid path
+//            .load();
+//
+//        assertThrows(RuntimeException.class, flyway::migrate);
+//    }
+//    
+//    @Test
+//    @Order(16)
+//    @DisplayName("JOptionPane shown on connection failure")
+//    void testJOptionPaneOnConnectionFailure() throws Exception {
+//        Properties properties = (Properties) propsField.get(null);
+//        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/db");
+//        
+//        // Redirect stderr to suppress console output
+//        ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+//        System.setErr(new PrintStream(errContent));
+//        
+//        assertThrows(RuntimeException.class, DatabaseConfig::initialize);
+//        assertTrue(errContent.toString().contains("Cannot connect to database"));
+//        System.setErr(System.err); // Reset
+//    }
+    
+    @Test
+    @Order(17)
+    @DisplayName("Invalid Hikari parameters throw exceptions")
+    void testInvalidHikariParameters() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.pool.maxSize", "0");
+        
+        assertThrows(IllegalArgumentException.class, DatabaseConfig::initialize);
+    }
 }
