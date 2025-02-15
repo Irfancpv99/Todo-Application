@@ -4,7 +4,7 @@ import java.io.InputStream;
 import java.util.Properties;
 
 public class PropertiesLoader {
-    private static final Properties properties = new Properties();
+    private static  Properties properties = new Properties();
 
     static {
         try (InputStream input = PropertiesLoader.class.getClassLoader().getResourceAsStream("application.properties")) {

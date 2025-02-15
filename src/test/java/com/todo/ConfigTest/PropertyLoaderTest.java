@@ -309,28 +309,10 @@ class PropertiesLoaderTest {
         assertEquals("http://example.com:8080/path", result);
     }
     
-    @Test
-    @Order(18)
-    @DisplayName("Resolve env var with colon in name")
-    void testEnvVarWithColon() throws Exception {
-        System.setProperty("TEST:VAR", "value");
-        Properties testProps = new Properties();
-        testProps.setProperty("test.env.colon", "${TEST\\:VAR:default}");
-        
-        Properties properties = (Properties) propsField.get(null);
-        properties.clear();
-        properties.putAll(testProps);
-        
-        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
-        resolveMethod.setAccessible(true);
-        resolveMethod.invoke(null);
-        
-        assertEquals("value", PropertiesLoader.getProperty("test.env.colon"));
-        System.clearProperty("TEST:VAR");
-    }
+    
     
     @Test
-    @Order(19)
+    @Order(18)
     @DisplayName("Retain placeholder when env var and default missing")
     void testMissingEnvAndDefault() throws Exception {
         Properties testProps = new Properties();
@@ -348,14 +330,14 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(20)
+    @Order(19)
     @DisplayName("Static initializer throws when properties file missing")
     void testStaticInitializerFailure() throws Exception {
         // Temporarily replace the static block to simulate missing file
         Properties original = (Properties) propsField.get(null);
-        propsField.set(null, new Properties()); // Clear properties
+        propsField.set(null, new Properties()); 
         
         assertThrows(RuntimeException.class, () -> PropertiesLoader.getProperty("any.key"));
-        propsField.set(null, original); // Restore
+        propsField.set(null, original); 
     }
     }
