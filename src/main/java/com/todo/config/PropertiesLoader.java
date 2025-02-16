@@ -2,8 +2,6 @@ package com.todo.config;
 
 import java.io.InputStream;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class PropertiesLoader {
     private static  Properties properties = new Properties();
@@ -25,33 +23,41 @@ public class PropertiesLoader {
         Properties resolvedProps = new Properties();
         properties.forEach((key, value) -> {
             String stringValue = value.toString();
-            String resolvedValue = stringValue;
+            StringBuilder result = new StringBuilder();
+            int startIndex = 0;
             
-            // Pattern to match environment variables with optional default values
-            Pattern pattern = Pattern.compile("\\$\\{([^}]*?)(?::([^}]*))?}");
-            Matcher matcher = pattern.matcher(stringValue);
-            StringBuffer sb = new StringBuffer();
-            
-            while (matcher.find()) {
-                String envVarName = matcher.group(1);
-                String defaultValue = matcher.group(2);
+            while (true) {
+                int varStart = stringValue.indexOf("${", startIndex);
+                if (varStart == -1) {
+                    result.append(stringValue.substring(startIndex));
+                    break;
+                }
                 
-                // Get environment variable value or use default
-                String envValue = System.getenv(envVarName);
-                String replacement = envValue != null ? envValue : 
-                                   defaultValue != null ? defaultValue : 
-                                   matcher.group(0); // Keep original if no env var and no default
+                result.append(stringValue.substring(startIndex, varStart));
+                int varEnd = stringValue.indexOf("}", varStart);
+                if (varEnd == -1) {
+                    result.append(stringValue.substring(varStart));
+                    break;
+                }
                 
-                // Escape special regex characters in replacement
-                replacement = replacement.replace("$", "\\$");
-                replacement = replacement.replace("\\:", ":");
+                String var = stringValue.substring(varStart + 2, varEnd);
+                String[] parts = var.split(":", 2);
+                String envVar = parts[0];
+                String defaultValue = parts.length > 1 ? parts[1].replace("\\:", ":") : null;
                 
-                matcher.appendReplacement(sb, replacement);
+                String envValue = System.getenv(envVar);
+                if (envValue != null) {
+                    result.append(envValue);
+                } else if (defaultValue != null) {
+                    result.append(defaultValue);
+                } else {
+                    result.append("${").append(var).append("}");
+                }
+                
+                startIndex = varEnd + 1;
             }
-            matcher.appendTail(sb);
-            resolvedValue = sb.toString();
             
-            resolvedProps.setProperty(key.toString(), resolvedValue);
+            resolvedProps.setProperty(key.toString(), result.toString());
         });
         properties.clear();
         properties.putAll(resolvedProps);
