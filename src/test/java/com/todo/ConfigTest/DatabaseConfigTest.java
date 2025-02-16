@@ -193,7 +193,7 @@ class DatabaseConfigTest {
     @DisplayName("Should handle connection timeout")
     void testConnectionTimeout() throws Exception {
         Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.pool.connectionTimeout", "250"); // Minimum allowed timeout
+        properties.setProperty("db.pool.connectionTimeout", "250");
         properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/db");
         
         assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
@@ -250,4 +250,64 @@ class DatabaseConfigTest {
         
         assertThrows(IllegalArgumentException.class, DatabaseConfig::initialize);
     }
+    
+    @Test
+    @Order(17)
+    @DisplayName("Should handle Flyway migration failure")
+    void testFlywayMigrationFailure() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+      
+        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/nonexistent_db");
+        
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            DatabaseConfig.initialize();
+        });
+        
+        assertTrue(exception.getMessage().contains("Cannot connect to database"));
+    }
+    
+    @Test
+    @Order(18)
+    @DisplayName("Should handle already closed pool")
+    void testAlreadyClosedPool() throws Exception {
+        DatabaseConfig.initialize();
+        DatabaseConfig.closePool();
+        
+        assertDoesNotThrow(() -> {
+            try (Connection conn = DatabaseConfig.getConnection()) {
+                assertNotNull(conn);
+                assertFalse(conn.isClosed());
+            }
+        });
+    }
+    
+    @Test
+    @Order(19)
+    @DisplayName("Should handle connection release")
+    void testConnectionRelease() throws Exception {
+        DatabaseConfig.initialize();
+        Connection conn1 = DatabaseConfig.getConnection();
+        conn1.close();
+        Connection conn2 = DatabaseConfig.getConnection();
+        assertNotNull(conn2);
+        assertFalse(conn2.isClosed());
+        conn2.close();
+    }
+    
+    @Test
+    @Order(20)
+    @DisplayName("Should handle specific SQLException in initialize")
+    void testSpecificSQLException() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/nonexistent_db");
+        properties.setProperty("db.username", "invalid_user");
+        
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            DatabaseConfig.initialize();
+        });
+        
+        assertTrue(exception.getCause() instanceof SQLException);
+    }
+
+    
 }

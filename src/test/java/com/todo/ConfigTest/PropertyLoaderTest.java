@@ -61,7 +61,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(2)
+    @Order(1)
     @DisplayName("Should use default values when environment variables are missing")
     void testEnvironmentVariableDefaults() throws Exception {
         Properties testProps = new Properties();
@@ -79,7 +79,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(3)
+    @Order(2)
     @DisplayName("Should handle properties without environment variables")
     void testPlainProperties() throws Exception {
         Properties testProps = new Properties();
@@ -93,7 +93,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(4)
+    @Order(3)
     @DisplayName("Should get integer property with default value")
     void testGetIntegerProperty() {
         int defaultValue = 42;
@@ -111,7 +111,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(5)
+    @Order(4)
     @DisplayName("Should handle invalid integer properties")
     void testInvalidIntegerProperty() {
         Properties properties;
@@ -128,7 +128,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(6)
+    @Order(5)
     @DisplayName("Should print properties correctly")
     void testPrintProperties() {
         Properties properties;
@@ -147,7 +147,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(7)
+    @Order(6)
     @DisplayName("Should throw exception for missing required properties")
     void testMissingRequiredProperties() {
         Exception exception = assertThrows(RuntimeException.class, 
@@ -158,7 +158,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(8)
+    @Order(7)
     @DisplayName("Should handle missing properties with defaults")
     void testMissingPropertiesWithDefaults() {
         String defaultValue = "default";
@@ -168,7 +168,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(9)
+    @Order(8)
     @DisplayName("Should handle environment variables without defaults")
     void testEnvironmentVariablesWithoutDefaults() throws Exception {
         Properties testProps = new Properties();
@@ -182,7 +182,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(10)
+    @Order(9)
     @DisplayName("Should handle escaped colons in environment variables")
     void testEscapedColons() throws Exception {
         Properties testProps = new Properties();
@@ -202,7 +202,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(11)
+    @Order(10)
     @DisplayName("Should handle environment variables with empty default values")
     void testEmptyDefaultValues() throws Exception {
         Properties testProps = new Properties();
@@ -220,7 +220,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(12)
+    @Order(11)
     @DisplayName("Should handle properties file not found")
     void testPropertiesFileNotFound() {
         assertThrows(RuntimeException.class, () -> {
@@ -233,7 +233,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(13)
+    @Order(12)
     @DisplayName("Should handle malformed environment variable syntax")
     void testMalformedEnvironmentVariable() throws Exception {
         Properties testProps = new Properties();
@@ -251,7 +251,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(14)
+    @Order(13)
     @DisplayName("Should handle single environment variable with value")
     void testSingleEnvironmentVariable() throws Exception {
         Properties testProps = new Properties();
@@ -269,7 +269,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(15)
+    @Order(14)
     @DisplayName("Should handle empty properties file")
     void testEmptyPropertiesFile() throws Exception {
         Properties properties = (Properties) propsField.get(null);
@@ -279,7 +279,7 @@ class PropertiesLoaderTest {
     }
 
     @Test
-    @Order(16)
+    @Order(15)
     @DisplayName("Should handle empty environment variable name")
     void testEmptyEnvironmentVariableName() throws Exception {
         Properties testProps = new Properties();
@@ -293,7 +293,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(17)
+    @Order(16)
     @DisplayName("Should handle multiple colons in default value")
     void testMultipleColonsInDefault() throws Exception {
 
@@ -312,7 +312,7 @@ class PropertiesLoaderTest {
     
     
     @Test
-    @Order(18)
+    @Order(17)
     @DisplayName("Retain placeholder when env var and default missing")
     void testMissingEnvAndDefault() throws Exception {
         Properties testProps = new Properties();
@@ -330,7 +330,7 @@ class PropertiesLoaderTest {
     }
     
     @Test
-    @Order(19)
+    @Order(18)
     @DisplayName("Static initializer throws when properties file missing")
     void testStaticInitializerFailure() throws Exception {
         // Temporarily replace the static block to simulate missing file
@@ -340,4 +340,145 @@ class PropertiesLoaderTest {
         assertThrows(RuntimeException.class, () -> PropertiesLoader.getProperty("any.key"));
         propsField.set(null, original); 
     }
+    
+    @Test
+    @Order(19)
+    @DisplayName("Should handle circular environment variable references")
+    void testCircularReferences() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.circular1", "${test.circular2:default1}");
+        testProps.setProperty("test.circular2", "${test.circular1:default2}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        
+        assertEquals("default1", PropertiesLoader.getProperty("test.circular1"));
+        assertEquals("default2", PropertiesLoader.getProperty("test.circular2"));
     }
+    
+    @Test
+    @Order(20)
+    @DisplayName("Should handle property with only whitespace")
+    void testWhitespaceProperty() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.whitespace", "   ");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        assertEquals("   ", PropertiesLoader.getProperty("test.whitespace"));
+    }
+    
+    @Test
+    @Order(21)
+    @DisplayName("Should handle environment variable with special characters")
+    void testSpecialCharactersInEnvVar() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.special", "${SPECIAL_VAR:!@#$%^&*()}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        
+        assertEquals("!@#$%^&*()", PropertiesLoader.getProperty("test.special"));
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName("Should handle null property value")
+    void testNullPropertyValue() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("test.null", "");
+        
+        String value = PropertiesLoader.getProperty("test.null");
+        assertEquals("", value);
+    }
+    
+    @Test
+    @Order(23)
+    @DisplayName("Should handle multiple environment variables in single property")
+    void testMultipleEnvironmentVariables() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.multiple", "${VAR1:default1}_${VAR2:default2}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        System.out.println("Actual resolved value: " + PropertiesLoader.getProperty("test.multiple"));
+        
+        assertEquals("default1_default2", PropertiesLoader.getProperty("test.multiple"), 
+                    "Multiple environment variables should be resolved properly");
+    }
+
+    @Test
+    @Order(24)
+    @DisplayName("Should handle sequential environment variables")
+    void testSequentialEnvironmentVariables() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.sequential", "${FIRST:one}${SECOND:two}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+        System.out.println("Actual resolved value: " + PropertiesLoader.getProperty("test.sequential"));
+        
+        assertEquals("onetwo", PropertiesLoader.getProperty("test.sequential"));
+    }
+
+    @Test
+    @Order(25)
+    @DisplayName("Should handle environment variables with separators")
+    void testEnvironmentVariablesWithSeparators() throws Exception {
+        Properties testProps = new Properties();
+        testProps.setProperty("test.separators", "${VAR1:first}-${VAR2:second}");
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.clear();
+        properties.putAll(testProps);
+        
+        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+        resolveMethod.setAccessible(true);
+        resolveMethod.invoke(null);
+
+        System.out.println("Actual resolved value: " + PropertiesLoader.getProperty("test.separators"));
+        
+        assertEquals("first-second", PropertiesLoader.getProperty("test.separators"));
+    }
+  
+  @Test
+  @Order(26)
+  @DisplayName("Should handle very long property values")
+  void testVeryLongPropertyValue() throws Exception {
+      StringBuilder longValue = new StringBuilder();
+      for (int i = 0; i < 1000; i++) {
+          longValue.append("very_long_value_");
+      }
+      
+      Properties testProps = new Properties();
+      testProps.setProperty("test.long", longValue.toString());
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      assertEquals(longValue.toString(), PropertiesLoader.getProperty("test.long"));
+  }
+ }

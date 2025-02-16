@@ -2,6 +2,8 @@ package com.todo.config;
 
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class PropertiesLoader {
     private static  Properties properties = new Properties();
@@ -23,33 +25,33 @@ public class PropertiesLoader {
         Properties resolvedProps = new Properties();
         properties.forEach((key, value) -> {
             String stringValue = value.toString();
-            if (stringValue.startsWith("${") && stringValue.endsWith("}")) {
-                // Extract environment variable name and default value
-                String envVarFull = stringValue.substring(2, stringValue.length() - 1);
-                
-                // Replace escaped colons (\:) with a placeholder
-                String tempString = envVarFull.replace("\\:", "[COLON]");
-                
-                // Now split safely
-                String[] parts = tempString.contains(":") ? tempString.split(":", 2) : new String[]{tempString};
-                
-                // Restore colons in the default value
-                String envVar = parts[0].replace("[COLON]", ":");
-                String defaultValue = parts.length > 1 ? parts[1].replace("[COLON]", ":") : null;
+            String resolvedValue = stringValue;
+            
+            // Pattern to match environment variables with optional default values
+            Pattern pattern = Pattern.compile("\\$\\{([^}]*?)(?::([^}]*))?}");
+            Matcher matcher = pattern.matcher(stringValue);
+            StringBuffer sb = new StringBuffer();
+            
+            while (matcher.find()) {
+                String envVarName = matcher.group(1);
+                String defaultValue = matcher.group(2);
                 
                 // Get environment variable value or use default
-                String envValue = System.getenv(envVar);
-                if (envValue != null) {
-                    resolvedProps.setProperty(key.toString(), envValue);
-                } else if (defaultValue != null) {
-                    resolvedProps.setProperty(key.toString(), defaultValue);
-                } else {
-                    // If no env var and no default, keep original value
-                    resolvedProps.setProperty(key.toString(), stringValue);
-                }
-            } else {
-                resolvedProps.setProperty(key.toString(), stringValue);
+                String envValue = System.getenv(envVarName);
+                String replacement = envValue != null ? envValue : 
+                                   defaultValue != null ? defaultValue : 
+                                   matcher.group(0); // Keep original if no env var and no default
+                
+                // Escape special regex characters in replacement
+                replacement = replacement.replace("$", "\\$");
+                replacement = replacement.replace("\\:", ":");
+                
+                matcher.appendReplacement(sb, replacement);
             }
+            matcher.appendTail(sb);
+            resolvedValue = sb.toString();
+            
+            resolvedProps.setProperty(key.toString(), resolvedValue);
         });
         properties.clear();
         properties.putAll(resolvedProps);
