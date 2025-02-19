@@ -5,6 +5,7 @@ import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
@@ -144,28 +145,124 @@ class DatabaseConfigTest {
         }, "Closing pool multiple times should not throw exception");
     }
     
-    @Test 
+    @Test
     @Order(7)
-    @DisplayName("Should handle database URL retrieval")
-    void testGetDbUrl() {
-        String properties = PropertiesLoader.getProperty("db.url", "jdbc:postgresql://localhost:5432/testdb");
-        assertNotNull(properties);
+    @DisplayName("Test getDbUrl method")
+    void testGetDbUrl() throws Exception {
+    	
+        Method getDbUrlMethod = DatabaseConfig.class.getDeclaredMethod("getDbUrl");
+        getDbUrlMethod.setAccessible(true);
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "jdbc:test:url");
+        
+        String result = (String) getDbUrlMethod.invoke(null);
+        assertEquals("jdbc:test:url", result);
     }
     
     @Test
     @Order(8) 
-    @DisplayName("Should handle database username retrieval")
-    void testGetDbUsername() {
-        String properties = PropertiesLoader.getProperty("db.username", "test_user");
-        assertNotNull(properties);
+    @DisplayName("Test getDbUsername method")
+    void testGetDbUsername() throws Exception {
+       
+        Method getDbUsernameMethod = DatabaseConfig.class.getDeclaredMethod("getDbUsername");
+        getDbUsernameMethod.setAccessible(true);
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.username", "test_username");
+        
+        String result = (String) getDbUsernameMethod.invoke(null);
+        assertEquals("test_username", result);
     }
     
     @Test
     @Order(9)
-    @DisplayName("Should handle database password retrieval")
-    void testGetDbPassword() {
-        String properties = PropertiesLoader.getProperty("db.password", "test_pass");
-        assertNotNull(properties);
+    @DisplayName("Test getDbPassword method")
+    void testGetDbPassword() throws Exception {
+       
+        Method getDbPasswordMethod = DatabaseConfig.class.getDeclaredMethod("getDbPassword");
+        getDbPasswordMethod.setAccessible(true);
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.password", "test_password");
+        
+        String result = (String) getDbPasswordMethod.invoke(null);
+        assertEquals("test_password", result);
+    }
+    
+    @Test
+    @Order(10)
+    @DisplayName("Test initialize with missing DB URL")
+    void testInitializeWithMissingDbUrl() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.remove("db.url");
+        
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        assertTrue(exception.getMessage().contains("not found in application.properties") || 
+                   exception.getCause() instanceof RuntimeException);
+    }
+    
+    @Test
+    @Order(10)
+    @DisplayName("Test initialize with missing DB username")
+    void testInitializeWithMissingDbUsername() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.remove("db.username");
+        
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        assertTrue(exception.getMessage().contains("not found in application.properties") || 
+                   exception.getCause() instanceof RuntimeException);
+    }
+    
+    @Test
+    @DisplayName("Test initialize with missing DB password")
+    void testInitializeWithMissingDbPassword() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.remove("db.password");
+        
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        assertTrue(exception.getMessage().contains("not found in application.properties") || 
+                   exception.getCause() instanceof RuntimeException);
+    }
+    
+    @Test
+    @DisplayName("Test getConnection with already closed connection")
+    void testGetConnectionWithClosedConnection() throws Exception {
+        // Initialize the database
+        DatabaseConfig.initialize();
+        
+        // Get connection and close it
+        Connection conn1 = DatabaseConfig.getConnection();
+        conn1.close();
+        assertTrue(conn1.isClosed());
+        
+        // Should get new connection
+        Connection conn2 = DatabaseConfig.getConnection();
+        assertNotNull(conn2);
+        assertFalse(conn2.isClosed());
+        
+        // Clean up
+        conn2.close();
+    }
+    
+    
+    @Test
+    @DisplayName("Test initialize after closing pool")
+    void testInitializeAfterClosingPool() throws Exception {
+        DatabaseConfig.initialize();
+        DatabaseConfig.closePool();
+        
+        // Should reinitialize without issues
+        assertDoesNotThrow(() -> {
+            DatabaseConfig.initialize();
+            try (Connection conn = DatabaseConfig.getConnection()) {
+                assertNotNull(conn);
+                assertFalse(conn.isClosed());
+            }
+        });
     }
     
     @Test
@@ -313,6 +410,5 @@ class DatabaseConfigTest {
         
         assertTrue(exception.getCause() instanceof SQLException);
     }
-
     
 }

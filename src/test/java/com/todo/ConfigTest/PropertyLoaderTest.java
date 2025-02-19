@@ -497,4 +497,165 @@ class PropertiesLoaderTest {
       
       assertEquals(longValue.toString(), PropertiesLoader.getProperty("test.long"));
   }
+  
+  @Test
+  @DisplayName("Test getIntProperty with extremely large value")
+  void testGetIntPropertyWithExtremeValue() throws Exception {
+      Properties properties = (Properties) propsField.get(null);
+      properties.setProperty("extreme.int", String.valueOf(Integer.MAX_VALUE));
+      
+      int result = PropertiesLoader.getIntProperty("extreme.int", 0);
+      assertEquals(Integer.MAX_VALUE, result);
+  }
+  
+  @Test
+  @DisplayName("Test getIntProperty with negative value")
+  void testGetIntPropertyWithNegativeValue() throws Exception {
+      Properties properties = (Properties) propsField.get(null);
+      properties.setProperty("negative.int", "-42");
+      
+      int result = PropertiesLoader.getIntProperty("negative.int", 0);
+      assertEquals(-42, result);
+  }
+  
+  @Test
+  @DisplayName("Test getProperty with environment variable containing special regex characters")
+  void testGetPropertyWithRegexSpecialChars() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("regex.special", "${REGEX_VAR:a+b*c?d(e)f[g]}");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      
+      assertEquals("a+b*c?d(e)f[g]", PropertiesLoader.getProperty("regex.special"));
+  }
+  
+  @Test
+  @DisplayName("Test getProperty with nested environment variables")
+  void testComplexNestedEnvironmentVariables() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("complex.nested", "prefix_${VAR1:${VAR2:${VAR3:final}}}_suffix");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      String actual = PropertiesLoader.getProperty("complex.nested");
+      assertEquals("prefix_${VAR2:${VAR3:final}}_suffix", actual);
+      
+  }
+  
+  @Test
+  @DisplayName("Test extreme edge case with unclosed variable placeholder")
+  void testUnclosedVariablePlaceholder() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("unclosed.var", "start ${UNCLOSED_VAR");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      
+      // The behavior is to leave it as is
+      assertEquals("start ${UNCLOSED_VAR", PropertiesLoader.getProperty("unclosed.var"));
+  }
+  
+  @Test
+  @DisplayName("Test extreme edge case with multiple consecutive escaped colons")
+  void testMultipleConsecutiveEscapedColons() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("multiple.escaped.colons", "${TEST_VAR:a\\:\\:\\:b}");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      
+      assertEquals("a:::b", PropertiesLoader.getProperty("multiple.escaped.colons"));
+  }
+  
+  @Test
+  @DisplayName("Test resolveEnvironmentVariables with variable at end of string")
+  void testVariableAtEndOfString() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("var.at.end", "prefix_${END_VAR:end}");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      
+      assertEquals("prefix_end", PropertiesLoader.getProperty("var.at.end"));
+  }
+  
+  @Test
+  @DisplayName("Test resolveEnvironmentVariables with variable at start of string")
+  void testVariableAtStartOfString() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("var.at.start", "${START_VAR:start}_suffix");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      
+      assertEquals("start_suffix", PropertiesLoader.getProperty("var.at.start"));
+  }
+  
+  @Test
+  @DisplayName("Test overlapping environment variable patterns")
+  void testOverlappingEnvironmentVariablePatterns() throws Exception {
+      Properties testProps = new Properties();
+      testProps.setProperty("overlapping.vars", "${PREFIX_${INNER:inner}_SUFFIX:default}");
+      
+      Properties properties = (Properties) propsField.get(null);
+      properties.clear();
+      properties.putAll(testProps);
+      
+      Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+      resolveMethod.setAccessible(true);
+      resolveMethod.invoke(null);
+      String result = PropertiesLoader.getProperty("overlapping.vars");
+      assertNotNull(result);
+  }
+  
+  @Test
+  @DisplayName("Test empty key in getProperty")
+  void testEmptyKeyInGetProperty() {
+      Exception exception = assertThrows(RuntimeException.class,
+          () -> PropertiesLoader.getProperty("")
+      );
+      assertTrue(exception.getMessage().contains("not found"));
+  }
+  
+  @Test
+  @DisplayName("Test null key in getProperty with default")
+  void testNullKeyInGetPropertyWithDefault() {
+      
+      assertThrows(NullPointerException.class,
+          () -> PropertiesLoader.getProperty(null, "default")
+      );
+      
+  }
+  
  }

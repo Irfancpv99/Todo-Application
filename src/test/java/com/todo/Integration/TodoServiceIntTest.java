@@ -396,6 +396,12 @@ class TodoServiceIntTest {
             Priority.HIGH,
             Tags.Urgent
         );
+        
+        Todo retrievedTodo3 = todoService.getTodoById(todo3.getId());
+        assertNotNull(retrievedTodo3, "Third todo should exist");
+        assertEquals("Task 3", retrievedTodo3.getTitle());
+        assertEquals(Priority.HIGH, retrievedTodo3.getPriority());
+        assertEquals(Tags.Urgent, retrievedTodo3.getTags());
 
         List<Todo> allTodos = todoService.getTodosByUserId(userId);
         assertEquals(3, allTodos.size(), "Should have all three todos");

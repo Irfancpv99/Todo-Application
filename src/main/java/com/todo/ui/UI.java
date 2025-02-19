@@ -102,7 +102,7 @@ public class UI extends JFrame {
             showMessage("Login successful - " + user.getUsername(), JOptionPane.INFORMATION_MESSAGE);
             clearFields();
             launchTodoUI(user);
-            dispose(); // Close login window
+            dispose();
         } catch (IllegalArgumentException e) {
             showMessage(e.getMessage(), JOptionPane.ERROR_MESSAGE);
         } finally {
