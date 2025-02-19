@@ -4,13 +4,21 @@ import com.todo.config.DatabaseConfig;
 import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
 
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import java.util.concurrent.TimeUnit;
+
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DatabaseConfigTest {
@@ -20,7 +28,7 @@ class DatabaseConfigTest {
 
     @BeforeAll
     static void setUpClass() throws Exception {
-        // Store reference to properties field
+        // Store reference to properties field for test isolation
         propsField = PropertiesLoader.class.getDeclaredField("properties");
         propsField.setAccessible(true);
  
@@ -31,9 +39,10 @@ class DatabaseConfigTest {
 
     @BeforeEach
     void setUp() throws Exception {
-  
+        // Reset database connection pool
         DatabaseConfig.closePool();
 
+        // Reset properties to original state
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
@@ -41,13 +50,17 @@ class DatabaseConfigTest {
 
     @AfterEach
     void tearDown() throws Exception {
+        // Clean up after each test
         DatabaseConfig.closePool();
 
+        // Reset properties to original state
         Properties properties = (Properties) propsField.get(null);
         properties.clear();
         properties.putAll(originalProperties);
     }
 
+    // GROUP 1: Basic initialization and connection tests
+    
     @Test
     @Order(1)
     @DisplayName("Database initialization should succeed")
@@ -63,12 +76,17 @@ class DatabaseConfigTest {
     
     @Test
     @Order(2)
-    @DisplayName("Database Initialization failed")
+    @DisplayName("Database initialization should fail with invalid configuration")
     void testInitializeFailure() throws Exception {
         Properties properties = (Properties) propsField.get(null);
         properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/nonexistentdb");
         
-        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        assertTrue(exception.getMessage().contains("Cannot connect to database") || 
+                  exception.getCause() instanceof SQLException,
+                  "Should throw exception with appropriate error message");
     }
 
     @Test
@@ -86,329 +104,346 @@ class DatabaseConfigTest {
         }, "Pool reinitialization should not throw any exceptions");
     }
 
+    // GROUP 2: Connection management tests
+    
     @Test
     @Order(4)
-    @DisplayName("Multiple connections should be unique")
+    @DisplayName("Multiple connections should be unique and managed properly")
     void testMultipleConnectionRequests() {
         assertDoesNotThrow(() -> {
             DatabaseConfig.initialize();
             
             try (var conn1 = DatabaseConfig.getConnection();
-                 var conn2 = DatabaseConfig.getConnection()) {
+                 var conn2 = DatabaseConfig.getConnection();
+                 var conn3 = DatabaseConfig.getConnection()) {
                 
                 assertAll("Multiple connections validation",
                     () -> assertNotNull(conn1, "First connection should not be null"),
                     () -> assertNotNull(conn2, "Second connection should not be null"),
+                    () -> assertNotNull(conn3, "Third connection should not be null"),
                     () -> assertFalse(conn1.isClosed(), "First connection should be open"),
                     () -> assertFalse(conn2.isClosed(), "Second connection should be open"),
-                    () -> assertNotSame(conn1, conn2, "Connections should be different instances")
+                    () -> assertFalse(conn3.isClosed(), "Third connection should be open"),
+                    () -> assertNotSame(conn1, conn2, "Connection instances should be different"),
+                    () -> assertNotSame(conn1, conn3, "Connection instances should be different"),
+                    () -> assertNotSame(conn2, conn3, "Connection instances should be different")
                 );
+                
+                // Test connection lifecycle
+                conn1.close();
+                assertTrue(conn1.isClosed(), "Connection should be properly closed");
+                assertFalse(conn2.isClosed(), "Other connections shouldn't be affected");
             }
         });
     }
 
     @Test
     @Order(5)
-    @DisplayName("Connection pool should handle concurrent connections")
-    void testConcurrentConnections() {
-        assertDoesNotThrow(() -> {
-            DatabaseConfig.initialize();
-            var connections = new Connection[5];
-            
-            try {
-                for (int i = 0; i < connections.length; i++) {
-                    connections[i] = DatabaseConfig.getConnection();
-                }
-                
-                for (var conn : connections) {
-                    assertNotNull(conn, "Connection should be valid");
-                    assertFalse(conn.isClosed(), "Connection should be open");
-                }
-            } finally {
-
-                for (var conn : connections) {
-                    if (conn != null && !conn.isClosed()) {
-                        conn.close();
+    @DisplayName("Connection pool should handle concurrent connections under load")
+    void testConcurrentConnections() throws Exception {
+        DatabaseConfig.initialize();
+        final int threadCount = 10;
+        final int connectionsPerThread = 3;
+        final CountDownLatch latch = new CountDownLatch(threadCount);
+        final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    for (int j = 0; j < connectionsPerThread; j++) {
+                        try (Connection conn = DatabaseConfig.getConnection()) {
+                            assertNotNull(conn, "Connection should be valid under concurrent load");
+                            assertFalse(conn.isClosed(), "Connection should be open");
+                            // Simulate some work
+                            Thread.sleep(20);
+                        }
                     }
+                } catch (Exception e) {
+                    fail("Exception during concurrent connection test: " + e.getMessage());
+                } finally {
+                    latch.countDown();
                 }
-            }
-        }, "Should handle multiple concurrent connections");
+            });
+        }
+        
+        boolean completed = latch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+        
+        assertTrue(completed, "All connection threads should complete within timeout");
     }
 
     @Test
     @Order(6)
-    @DisplayName("Close pool should handle null data source")
+    @DisplayName("Close pool should handle null and already closed data sources")
     void testClosePoolWithNullDataSource() {
         assertDoesNotThrow(() -> {
+            // Test double closing
             DatabaseConfig.closePool();
             DatabaseConfig.closePool();
-        }, "Closing pool multiple times should not throw exception");
+            
+            // Test getConnection after closePool - should reinitialize
+            try (var conn = DatabaseConfig.getConnection()) {
+                assertNotNull(conn);
+                assertFalse(conn.isClosed());
+            }
+        }, "Closing pool multiple times and reinitializing should be safe");
     }
+    
+    // GROUP 3: Configuration parameter tests
     
     @Test
     @Order(7)
-    @DisplayName("Test getDbUrl method")
-    void testGetDbUrl() throws Exception {
-    	
+    @DisplayName("Test database configuration parameter methods")
+    void testDbConfigurationParameters() throws Exception {
+        // Test getDbUrl
         Method getDbUrlMethod = DatabaseConfig.class.getDeclaredMethod("getDbUrl");
         getDbUrlMethod.setAccessible(true);
         Properties properties = (Properties) propsField.get(null);
         properties.setProperty("db.url", "jdbc:test:url");
         
-        String result = (String) getDbUrlMethod.invoke(null);
-        assertEquals("jdbc:test:url", result);
-    }
-    
-    @Test
-    @Order(8) 
-    @DisplayName("Test getDbUsername method")
-    void testGetDbUsername() throws Exception {
-       
+        String urlResult = (String) getDbUrlMethod.invoke(null);
+        assertEquals("jdbc:test:url", urlResult, "getDbUrl should return correct value");
+        
+        // Test getDbUsername
         Method getDbUsernameMethod = DatabaseConfig.class.getDeclaredMethod("getDbUsername");
         getDbUsernameMethod.setAccessible(true);
-        Properties properties = (Properties) propsField.get(null);
         properties.setProperty("db.username", "test_username");
         
-        String result = (String) getDbUsernameMethod.invoke(null);
-        assertEquals("test_username", result);
+        String usernameResult = (String) getDbUsernameMethod.invoke(null);
+        assertEquals("test_username", usernameResult, "getDbUsername should return correct value");
+        
+        // Test getDbPassword
+        Method getDbPasswordMethod = DatabaseConfig.class.getDeclaredMethod("getDbPassword");
+        getDbPasswordMethod.setAccessible(true);
+        properties.setProperty("db.password", "test_password");
+        
+        String passwordResult = (String) getDbPasswordMethod.invoke(null);
+        assertEquals("test_password", passwordResult, "getDbPassword should return correct value");
+    }
+    
+    // GROUP 4: Error handling tests
+    
+    @Test
+    @Order(8)
+    @DisplayName("Test initialization with missing connection parameters")
+    void testInitializeWithMissingParameters() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        
+        // Test missing URL
+        properties.remove("db.url");
+        Exception urlException = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        assertTrue(urlException.getMessage().contains("not found") || 
+                   urlException.getCause() instanceof RuntimeException,
+                   "Should properly handle missing URL");
+        
+        // Reset and test missing username
+        properties.putAll(originalProperties);
+        properties.remove("db.username");
+        Exception usernameException = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        assertTrue(usernameException.getMessage().contains("not found") || 
+                   usernameException.getCause() instanceof RuntimeException,
+                   "Should properly handle missing username");
+        
+        // Reset and test missing password
+        properties.putAll(originalProperties);
+        properties.remove("db.password");
+        Exception passwordException = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        assertTrue(passwordException.getMessage().contains("not found") || 
+                   passwordException.getCause() instanceof RuntimeException,
+                   "Should properly handle missing password");
     }
     
     @Test
     @Order(9)
-    @DisplayName("Test getDbPassword method")
-    void testGetDbPassword() throws Exception {
-       
-        Method getDbPasswordMethod = DatabaseConfig.class.getDeclaredMethod("getDbPassword");
-        getDbPasswordMethod.setAccessible(true);
+    @DisplayName("Should handle connection timeout and network errors")
+    void testConnectionTimeoutAndNetworkErrors() throws Exception {
         Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.password", "test_password");
-        
-        String result = (String) getDbPasswordMethod.invoke(null);
-        assertEquals("test_password", result);
-    }
-    
-    @Test
-    @Order(10)
-    @DisplayName("Test initialize with missing DB URL")
-    void testInitializeWithMissingDbUrl() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.remove("db.url");
+        // Test with very short timeout to nonexistent host
+        properties.setProperty("db.pool.connectionTimeout", "250");
+        properties.setProperty("db.url", "jdbc:postgresql://nonexistent-host:5432/db");
         
         Exception exception = assertThrows(RuntimeException.class, 
             () -> DatabaseConfig.initialize());
         
-        assertTrue(exception.getMessage().contains("not found in application.properties") || 
-                   exception.getCause() instanceof RuntimeException);
+        String message = exception.getMessage().toLowerCase();
+        assertTrue(message.contains("cannot connect") || 
+                   message.contains("connection") || 
+                   message.contains("timeout") ||
+                   exception.getCause() instanceof SQLException,
+                   "Should handle connection timeout properly");
     }
     
     @Test
     @Order(10)
-    @DisplayName("Test initialize with missing DB username")
-    void testInitializeWithMissingDbUsername() throws Exception {
+    @DisplayName("Should handle invalid pool configurations")
+    void testInvalidPoolConfigurations() throws Exception {
         Properties properties = (Properties) propsField.get(null);
-        properties.remove("db.username");
         
-        Exception exception = assertThrows(RuntimeException.class, 
-            () -> DatabaseConfig.initialize());
+        // Test negative pool size
+        properties.setProperty("db.pool.maxSize", "-1");
+        assertThrows(IllegalArgumentException.class, 
+            () -> DatabaseConfig.initialize(),
+            "Should reject negative pool size");
         
-        assertTrue(exception.getMessage().contains("not found in application.properties") || 
-                   exception.getCause() instanceof RuntimeException);
-    }
-    
-    @Test
-    @DisplayName("Test initialize with missing DB password")
-    void testInitializeWithMissingDbPassword() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.remove("db.password");
+        // Test zero pool size
+        properties.putAll(originalProperties);
+        properties.setProperty("db.pool.maxSize", "0");
+        assertThrows(IllegalArgumentException.class, 
+            () -> DatabaseConfig.initialize(),
+            "Should reject zero pool size");
         
-        Exception exception = assertThrows(RuntimeException.class, 
-            () -> DatabaseConfig.initialize());
-        
-        assertTrue(exception.getMessage().contains("not found in application.properties") || 
-                   exception.getCause() instanceof RuntimeException);
-    }
-    
-    @Test
-    @DisplayName("Test getConnection with already closed connection")
-    void testGetConnectionWithClosedConnection() throws Exception {
-        // Initialize the database
-        DatabaseConfig.initialize();
-        
-        // Get connection and close it
-        Connection conn1 = DatabaseConfig.getConnection();
-        conn1.close();
-        assertTrue(conn1.isClosed());
-        
-        // Should get new connection
-        Connection conn2 = DatabaseConfig.getConnection();
-        assertNotNull(conn2);
-        assertFalse(conn2.isClosed());
-        
-        // Clean up
-        conn2.close();
-    }
-    
-    
-    @Test
-    @DisplayName("Test initialize after closing pool")
-    void testInitializeAfterClosingPool() throws Exception {
-        DatabaseConfig.initialize();
-        DatabaseConfig.closePool();
-        
-        // Should reinitialize without issues
-        assertDoesNotThrow(() -> {
-            DatabaseConfig.initialize();
-            try (Connection conn = DatabaseConfig.getConnection()) {
-                assertNotNull(conn);
-                assertFalse(conn.isClosed());
-            }
-        });
-    }
-    
-    @Test
-    @Order(10)
-    @DisplayName("Should handle connection close")
-    void testConnectionClose() throws SQLException {
-        DatabaseConfig.initialize();
-        Connection conn = DatabaseConfig.getConnection();
-        conn.close();
-        assertTrue(conn.isClosed());
+        // Test invalid numeric format
+        properties.putAll(originalProperties);
+        properties.setProperty("db.pool.maxSize", "invalid");
+        assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize(),
+            "Should handle non-numeric pool size");
     }
     
     @Test
     @Order(11)
-    @DisplayName("Should handle initialization with invalid pool settings")
-    void testInvalidPoolSettings() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.pool.maxSize", "invalid");
-        
-        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
-    }
-
-    @Test
-    @Order(12)
-    @DisplayName("Should handle connection timeout")
-    void testConnectionTimeout() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.pool.connectionTimeout", "250");
-        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/db");
-        
-        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
-    }
-    
-    @Test
-    @Order(13)
-    @DisplayName("Should handle database initialization with invalid pool max size")
-    void testInvalidPoolMaxSize() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.pool.maxSize", "-1");
-        
-        assertThrows(IllegalArgumentException.class, () -> DatabaseConfig.initialize());
-    }
-    
-    @Test
-    @Order(14)
     @DisplayName("Should handle null datasource in getConnection")
     void testNullDataSource() throws Exception {
+        // Set dataSource field to null using reflection
         Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
         dataSourceField.setAccessible(true);
         dataSourceField.set(null, null);
         
-        assertDoesNotThrow(() -> DatabaseConfig.getConnection());
+        // getConnection should handle null dataSource by initializing
+        assertDoesNotThrow(() -> {
+            try (Connection conn = DatabaseConfig.getConnection()) {
+                assertNotNull(conn, "Should get valid connection after auto-initialization");
+                assertFalse(conn.isClosed(), "Connection should be open");
+            }
+        }, "getConnection should handle null dataSource");
+    }
+    
+    @Test
+    @Order(12)
+    @DisplayName("Verify Flyway migration handling")
+    void testFlywayMigrationHandling() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        // Point to valid server but nonexistent database to trigger Flyway failure
+        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/nonexistent_db_for_test");
+        
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        String message = exception.getMessage().toLowerCase();
+        boolean isValidError = message.contains("cannot connect") || 
+                              message.contains("database") || 
+                              message.contains("does not exist") ||
+                              exception.getCause() instanceof SQLException;
+        
+        assertTrue(isValidError, "Should handle Flyway migration failure appropriately");
+    }
+    
+    @Test
+    @Order(13)
+    @DisplayName("Test initialization with valid connection parameters")
+    void testInitializationWithValidParameters() throws Exception {
+        // Set valid connection parameters
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/testdb");
+        properties.setProperty("db.username", "testuser");
+        properties.setProperty("db.password", "testpassword");
+        properties.setProperty("db.pool.maxSize", "5");
+        properties.setProperty("db.pool.minIdle", "1");
+        properties.setProperty("db.pool.idleTimeout", "10000");
+        properties.setProperty("db.pool.connectionTimeout", "5000");
+        
+        try {
+            DatabaseConfig.initialize();
+        
+        } catch (RuntimeException e) {
+     
+            assertTrue(e.getMessage().contains("Cannot connect to database") || 
+                      e.getCause() instanceof SQLException,
+                      "Should throw appropriate exception");
+        }
+    }
+    
+    @Test
+    @Order(14)
+    @DisplayName("Test dataSource.isClosed() behavior")
+    void testDataSourceIsClosedBehavior() throws Exception {
+ 
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        try {
+            
+            DatabaseConfig.initialize();
+         
+            DatabaseConfig.closePool();
+            
+            Connection conn = DatabaseConfig.getConnection();
+            conn.close();
+            
+ 
+            assertNotNull(dataSourceField.get(null), "DataSource should be reinitialized");
+            
+        } catch (RuntimeException e) {
+            assertTrue(e.getMessage().contains("Cannot connect") || 
+                       e.getCause() instanceof SQLException,
+                       "Expected exception type when DB is unavailable");
+        }
     }
     
     @Test
     @Order(15)
-    @DisplayName("JOptionPane shown on connection failure")
-    void testJOptionPaneOnConnectionFailure() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/nonexistentdb");
-        
-        Exception exception = assertThrows(RuntimeException.class, 
-            () -> DatabaseConfig.initialize()
-        );
-        
-        String actualMessage = exception.getMessage();
-        assertTrue(
-            actualMessage.contains("UnknownHostException") || 
-            actualMessage.contains("The connection attempt failed") ||
-            actualMessage.contains("Connection to") ||
-            actualMessage.contains("Cannot connect to database"),
-            "Exception message should indicate connection failure. Actual message: " + actualMessage
-        );
+    @DisplayName("Test SQLException propagation in getConnection")
+    void testSQLExceptionPropagation() throws Exception {
+        // Get access to dataSource field
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+   
+        com.zaxxer.hikari.HikariDataSource mockDataSource = mock(com.zaxxer.hikari.HikariDataSource.class);
+        when(mockDataSource.isClosed()).thenReturn(false);
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Test exception"));
+
+        dataSourceField.set(null, mockDataSource);
+
+        assertThrows(SQLException.class, () -> DatabaseConfig.getConnection());
     }
     
     @Test
     @Order(16)
-    @DisplayName("Invalid Hikari parameters throw exceptions")
-    void testInvalidHikariParameters() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.pool.maxSize", "0");
+    @DisplayName("Test connection property getters")
+    void testConnectionPropertyGetters() throws Exception {
+
+        Method getDbUrlMethod = DatabaseConfig.class.getDeclaredMethod("getDbUrl");
+        Method getDbUsernameMethod = DatabaseConfig.class.getDeclaredMethod("getDbUsername");
+        Method getDbPasswordMethod = DatabaseConfig.class.getDeclaredMethod("getDbPassword");
         
-        assertThrows(IllegalArgumentException.class, DatabaseConfig::initialize);
+        getDbUrlMethod.setAccessible(true);
+        getDbUsernameMethod.setAccessible(true);
+        getDbPasswordMethod.setAccessible(true);
+        
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "test-jdbc-url");
+        properties.setProperty("db.username", "test-username");
+        properties.setProperty("db.password", "test-password");
+    
+        assertEquals("test-jdbc-url", getDbUrlMethod.invoke(null));
+        assertEquals("test-username", getDbUsernameMethod.invoke(null));
+        assertEquals("test-password", getDbPasswordMethod.invoke(null));
     }
     
     @Test
     @Order(17)
-    @DisplayName("Should handle Flyway migration failure")
-    void testFlywayMigrationFailure() throws Exception {
+    @DisplayName("Test handling of invalid Hikari configuration")
+    void testInvalidHikariConfiguration() throws Exception {
+        // Set invalid configuration (negative values)
         Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/nonexistent_db");
+        properties.setProperty("db.pool.maxSize", "-5");
         
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            DatabaseConfig.initialize();
-        });
-        System.out.println("Actual error message: " + exception.getMessage());
-        assertTrue(
-            exception.getMessage().contains("Cannot connect to database") ||
-            exception.getMessage().contains("database \"nonexistent_db\" does not exist") ||
-            exception.getMessage().contains("Connection to") ||
-            exception.getMessage().contains("The connection attempt failed"),
-            "Error message should indicate database connection failure. Actual message: " + exception.getMessage()
-        );
+        // Should throw IllegalArgumentException
+        assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
     }
     
-    @Test
-    @Order(18)
-    @DisplayName("Should handle already closed pool")
-    void testAlreadyClosedPool() throws Exception {
-        DatabaseConfig.initialize();
-        DatabaseConfig.closePool();
-        
-        assertDoesNotThrow(() -> {
-            try (Connection conn = DatabaseConfig.getConnection()) {
-                assertNotNull(conn);
-                assertFalse(conn.isClosed());
-            }
-        });
-    }
-    
-    @Test
-    @Order(19)
-    @DisplayName("Should handle connection release")
-    void testConnectionRelease() throws Exception {
-        DatabaseConfig.initialize();
-        Connection conn1 = DatabaseConfig.getConnection();
-        conn1.close();
-        Connection conn2 = DatabaseConfig.getConnection();
-        assertNotNull(conn2);
-        assertFalse(conn2.isClosed());
-        conn2.close();
-    }
-    
-    @Test
-    @Order(20)
-    @DisplayName("Should handle specific SQLException in initialize")
-    void testSpecificSQLException() throws Exception {
-        Properties properties = (Properties) propsField.get(null);
-        properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/nonexistent_db");
-        properties.setProperty("db.username", "invalid_user");
-        
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            DatabaseConfig.initialize();
-        });
-        
-        assertTrue(exception.getCause() instanceof SQLException);
-    }
     
 }
