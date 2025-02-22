@@ -4,20 +4,30 @@ import java.io.InputStream;
 import java.util.Properties;
 
 public class PropertiesLoader {
-    private static  Properties properties = new Properties();
-
+    private static Properties properties = new Properties();
+    
     static {
-        try (InputStream input = PropertiesLoader.class.getClassLoader().getResourceAsStream("application.properties")) {
+        String propertiesFile = isTestEnvironment() ? 
+            "application-test.properties" : "application.properties";
+        
+        try (InputStream input = PropertiesLoader.class.getClassLoader()
+                .getResourceAsStream(propertiesFile)) {
             if (input == null) {
-                throw new RuntimeException("application.properties not found in classpath");
+                throw new RuntimeException(propertiesFile + " not found in classpath");
             }
             properties.load(input);
-            // Resolve environment variables
             resolveEnvironmentVariables();
         } catch (Exception e) {
-            throw new RuntimeException("Could not load application.properties", e);
+            throw new RuntimeException("Could not load " + propertiesFile, e);
         }
     }
+    
+    private static boolean isTestEnvironment() {
+        return "test".equals(System.getProperty("spring.profiles.active")) ||
+               Boolean.parseBoolean(System.getProperty("test", "false"));
+    }
+    
+    
 
     private static void resolveEnvironmentVariables() {
         Properties resolvedProps = new Properties();

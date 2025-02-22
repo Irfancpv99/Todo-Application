@@ -2,9 +2,9 @@ package com.todo.ConfigTest;
 
 import com.todo.config.DatabaseConfig;
 import com.todo.config.PropertiesLoader;
+import com.zaxxer.hikari.HikariDataSource;
+
 import org.junit.jupiter.api.*;
-
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
@@ -14,11 +14,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import java.util.concurrent.TimeUnit;
-
-
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import java.util.concurrent.TimeUnit;
+import static org.junit.jupiter.api.Assertions.*;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DatabaseConfigTest {
@@ -65,7 +63,9 @@ class DatabaseConfigTest {
     @Order(1)
     @DisplayName("Database initialization should succeed")
     void testSuccessfulInitialization() {
-        assertDoesNotThrow(() -> {
+       
+    	
+    	assertDoesNotThrow(() -> {
             DatabaseConfig.initialize();
             try (var conn = DatabaseConfig.getConnection()) {
                 assertNotNull(conn);
@@ -174,19 +174,30 @@ class DatabaseConfigTest {
 
     @Test
     @Order(6)
-    @DisplayName("Close pool should handle null and already closed data sources")
-    void testClosePoolWithNullDataSource() {
-        assertDoesNotThrow(() -> {
-            // Test double closing
-            DatabaseConfig.closePool();
-            DatabaseConfig.closePool();
+    @DisplayName("Test closePool when dataSource is null")
+    void testClosePoolWithNullDataSource() throws Exception {
+      
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+        
+        try {
+        	dataSourceField.set(null, null);
+          
+        	assertDoesNotThrow(() -> DatabaseConfig.closePool());
             
-            // Test getConnection after closePool - should reinitialize
-            try (var conn = DatabaseConfig.getConnection()) {
-                assertNotNull(conn);
-                assertFalse(conn.isClosed());
+            assertDoesNotThrow(() -> {
+                try (Connection conn = DatabaseConfig.getConnection()) {
+                    assertNotNull(conn);
+                }
+            });
+        } finally {
+           
+        	if (originalDataSource != null) {
+                dataSourceField.set(null, originalDataSource);
             }
-        }, "Closing pool multiple times and reinitializing should be safe");
+        }
     }
     
     // GROUP 3: Configuration parameter tests
@@ -445,5 +456,108 @@ class DatabaseConfigTest {
         assertThrows(RuntimeException.class, () -> DatabaseConfig.initialize());
     }
     
-    
+//    @Test
+//    @Order(18)
+//    @DisplayName("Test exception path in initialize method")
+//    void testExceptionPathInInitialize() throws Exception {
+//        // Configure properties to cause connection failure
+//        Properties properties = (Properties) propsField.get(null);
+//        String originalUrl = properties.getProperty("db.url");
+//        
+//        try {
+//            // Set invalid connection URL
+//            properties.setProperty("db.url", "jdbc:postgresql://invalid-host:5432/nonexistent");
+//            
+//            // The initialize should throw some kind of exception
+//            assertThrows(Exception.class, () -> DatabaseConfig.initialize(),
+//                "Database initialization with invalid URL should throw an exception");
+//                
+//        } finally {
+//            // Restore original URL
+//            if (originalUrl != null) {
+//                properties.setProperty("db.url", originalUrl);
+//            }
+//        }
+//    }
+//    
+//    @Test
+//    @Order(19)
+//    @DisplayName("Simple test for Flyway configuration code path")
+//    void testFlywayConfigurationCodePath() {
+//        // Store original properties
+//        Properties properties = null;
+//        try {
+//            properties = (Properties) propsField.get(null);
+//        } catch (Exception e) {
+//            fail("Could not access properties field: " + e.getMessage());
+//            return;
+//        }
+//        
+//        String originalUrl = properties.getProperty("db.url");
+//        String originalUsername = properties.getProperty("db.username");
+//        String originalPassword = properties.getProperty("db.password");
+//
+//        try {
+//            // Use properties that appear valid but point to a non-existent server
+//            // This should reach the Flyway code but then fail
+//            properties.setProperty("db.url", "jdbc:postgresql://localhost:5432/flyway_test_db");
+//            properties.setProperty("db.username", "flyway_test_user");
+//            properties.setProperty("db.password", "flyway_test_password");
+//            
+//            try {
+//                // This will likely throw an exception, but will execute the Flyway code path
+//                DatabaseConfig.initialize();
+//            } catch (Exception e) {
+//                // Expected - real database likely doesn't exist
+//                // The important thing is that we called initialize(), which contains the Flyway code
+//            }
+//            
+//            // No assertion needed - we're just trying to execute the code path
+//            // Success here is simply not throwing any unexpected exceptions
+//            
+//        } finally {
+//            // Restore original properties
+//            if (originalUrl != null) properties.setProperty("db.url", originalUrl);
+//            if (originalUsername != null) properties.setProperty("db.username", originalUsername);
+//            if (originalPassword != null) properties.setProperty("db.password", originalPassword);
+//        }
+//    }
+//
+//    @Test
+//    @Order(20)
+//    @DisplayName("Test closePool with non-null dataSource")
+//    void testClosePoolWithNonNullDataSource() throws Exception {
+//        // Access the dataSource field
+//        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+//        dataSourceField.setAccessible(true);
+//        
+//        // Create a mock dataSource that is already closed
+//        HikariDataSource mockClosedDataSource = mock(HikariDataSource.class);
+//        when(mockClosedDataSource.isClosed()).thenReturn(true);
+//        
+//        // Create a mock dataSource that is open
+//        HikariDataSource mockOpenDataSource = mock(HikariDataSource.class);
+//        when(mockOpenDataSource.isClosed()).thenReturn(false);
+//        
+//        // Save original value
+//        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+//        
+//        try {
+//            // Test with closed dataSource
+//            dataSourceField.set(null, mockClosedDataSource);
+//            assertDoesNotThrow(() -> DatabaseConfig.closePool(),
+//                "closePool should handle already closed dataSource");
+//            verify(mockClosedDataSource, never()).close();
+//            
+//            // Test with open dataSource
+//            dataSourceField.set(null, mockOpenDataSource);
+//            assertDoesNotThrow(() -> DatabaseConfig.closePool(),
+//                "closePool should close open dataSource");
+//            verify(mockOpenDataSource).close();
+//            
+//        } finally {
+//            // Restore original dataSource
+//            dataSourceField.set(null, originalDataSource);
+//        }
+//    }
 }

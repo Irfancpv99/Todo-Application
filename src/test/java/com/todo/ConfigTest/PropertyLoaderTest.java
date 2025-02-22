@@ -2,7 +2,12 @@ package com.todo.ConfigTest;
 
 import com.todo.config.PropertiesLoader;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -58,8 +63,6 @@ class PropertiesLoaderTest {
         System.clearProperty("TEST_DB_PASSWORD");
     }
 
-    // GROUP 1: Basic property access tests
-
     @Test
     @Order(1)
     @DisplayName("Should get properties with and without defaults")
@@ -82,12 +85,11 @@ class PropertiesLoaderTest {
         assertTrue(exception.getMessage().contains("not found in application.properties"), 
             "Should throw with appropriate message for missing required property");
     }
-
-//    @ParameterizedTest
-//    @CsvSource({
-//        "test.int.valid, 100, 42, 100",
-//        "test.int.missing, , 42, 42"
-//    })
+    @ParameterizedTest
+    @CsvSource({
+        "test.int.valid, 100, 42, 100",
+        "test.int.missing, , 42, 42"
+    })
     @Order(2)
     @DisplayName("Should get integer properties correctly")
     void testGetIntegerProperty(String key, String value, int defaultValue, int expected) throws Exception {
@@ -140,8 +142,6 @@ class PropertiesLoaderTest {
                 "Should print second property")
         );
     }
-    
-    // GROUP 2: Environment variable resolution tests
     
     @Test
     @Order(5)
@@ -240,12 +240,12 @@ class PropertiesLoaderTest {
         );
     }
     
-//    @ParameterizedTest
-//    @ValueSource(strings = {
-//        "${UNCLOSED_VAR", 
-//        "prefix ${MISSING_CLOSE",
-//        "${EMPTY}"
-//    })
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "${UNCLOSED_VAR", 
+        "prefix ${MISSING_CLOSE",
+        "${EMPTY}"
+    })
     @Order(8)
     @DisplayName("Should handle malformed environment variable patterns")
     void testMalformedEnvironmentVariables(String badPattern) throws Exception {
@@ -426,7 +426,8 @@ class PropertiesLoaderTest {
     }
     
    
-    
+    @ParameterizedTest
+    @MethodSource("provideComplexVariablePatterns")
     @Order(16)
     @DisplayName("Test complex environment variable patterns")
     void testComplexEnvironmentVariablePatterns(String input, String expected) throws Exception {
@@ -452,7 +453,7 @@ class PropertiesLoaderTest {
             Arguments.of("${VAR1:val1}${VAR2:val2}", "val1val2"),
             Arguments.of("${VAR1:val1}_${VAR2:val2}_${VAR3:val3}", "val1_val2_val3"),
             Arguments.of("no_variables_here", "no_variables_here"),
-            Arguments.of("${:empty_name}", "empty_name"),  // Updated expectation
+            Arguments.of("${:empty_name}", "empty_name"), 
             Arguments.of("${}:after_empty", "${}:after_empty"),
             Arguments.of("${VAR:value\\:with\\:colons}", "value:with:colons"),
             Arguments.of("${VAR:\\:leading:colon}", ":leading:colon"),
@@ -532,4 +533,102 @@ class PropertiesLoaderTest {
             () -> assertEquals("start v1 middle v2 end", PropertiesLoader.getProperty("test.complex"))
         );
     }
+//    
+//    @Test
+//    @Order(19)
+//    @DisplayName("Test malformed environment variable patterns")
+//    void testMalformedEnvironmentVariables() throws Exception {
+//        Properties testProps = new Properties();
+//        
+//        testProps.setProperty("malformed.1", "${UNCLOSED");
+//        testProps.setProperty("malformed.2", "}CLOSED_WITHOUT_OPEN");
+//        testProps.setProperty("malformed.3", "${}");
+//        testProps.setProperty("malformed.4", "${:default}");
+//        testProps.setProperty("malformed.5", "${OUTER:${INNER}");
+//        testProps.setProperty("malformed.6", "${${NESTED}}");
+//        
+//        Properties properties = (Properties) propsField.get(null);
+//        properties.clear();
+//        properties.putAll(testProps);
+//        
+//        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+//        resolveMethod.setAccessible(true);
+//        resolveMethod.invoke(null);
+//        
+//        String result1 = PropertiesLoader.getProperty("malformed.1");
+//        String result2 = PropertiesLoader.getProperty("malformed.2");
+//        String result3 = PropertiesLoader.getProperty("malformed.3");
+//        String result4 = PropertiesLoader.getProperty("malformed.4");
+//        String result5 = PropertiesLoader.getProperty("malformed.5");
+//        String result6 = PropertiesLoader.getProperty("malformed.6");
+//       
+//        System.out.println("malformed.1 = " + result1);
+//        System.out.println("malformed.2 = " + result2);
+//        System.out.println("malformed.3 = " + result3);
+//        System.out.println("malformed.4 = " + result4);
+//        System.out.println("malformed.5 = " + result5);
+//        System.out.println("malformed.6 = " + result6);
+//        
+//        assertEquals(result1, result1); 
+//        assertEquals(result2, result2);
+//        assertEquals(result3, result3);
+//        assertEquals(result4, result4);
+//        assertEquals(result5, result5);
+//        assertEquals(result6, result6);
+//        
+//         assertNotNull(result1);
+//        assertNotNull(result2);
+//        assertNotNull(result3);
+//        assertNotNull(result4);
+//        assertNotNull(result5); 
+//        assertNotNull(result6);
+//    }
+//
+//    @Test
+//    @Order(20)
+//    @DisplayName("Test error handling in getProperty")
+//    void testErrorHandlingInGetProperty() {
+//       
+//        RuntimeException exception = assertThrows(RuntimeException.class,
+//            () -> PropertiesLoader.getProperty("definitely.does.not.exist"));
+//        
+//        assertTrue(exception.getMessage().contains("not found in application.properties"),
+//            "Exception message should indicate property not found");
+//        
+//        // Test with null key
+//        assertThrows(NullPointerException.class,
+//            () -> PropertiesLoader.getProperty(null));
+//            
+//        // Test with empty key
+//        assertThrows(RuntimeException.class,
+//            () -> PropertiesLoader.getProperty(""));
+//    }
+//
+//    @Test
+//    @Order(21)
+//    @DisplayName("Test complex nested environment variables")
+//    void testComplexNestedEnvironmentVariables() throws Exception {
+//        Properties testProps = new Properties();
+//        
+//        testProps.setProperty("complex.1", "${VAR1:one}${VAR2:two}${VAR3:three}");
+//        
+//        testProps.setProperty("complex.2", "${OUTER:${INNER:${DEEPEST:value}}}");
+//        
+//        testProps.setProperty("complex.3", "${SPECIAL:!@#$%^&*()}");
+//        
+//        testProps.setProperty("complex.4", "${VAR:prefix\\:suffix}");
+//        
+//        Properties properties = (Properties) propsField.get(null);
+//        properties.clear();
+//        properties.putAll(testProps);
+//        
+//        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+//        resolveMethod.setAccessible(true);
+//        resolveMethod.invoke(null);
+//        
+//        assertEquals("onetwothree", PropertiesLoader.getProperty("complex.1"));
+//        assertEquals("${INNER:${DEEPEST:value}}", PropertiesLoader.getProperty("complex.2"));
+//        assertEquals("!@#$%^&*()", PropertiesLoader.getProperty("complex.3"));
+//        assertEquals("prefix:suffix", PropertiesLoader.getProperty("complex.4"));
+//    }
 }

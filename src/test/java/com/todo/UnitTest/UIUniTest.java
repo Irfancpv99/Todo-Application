@@ -1,5 +1,7 @@
 package com.todo.UnitTest;
 
+import com.todo.ConfigTest.TestDatabaseConfig;
+import com.todo.config.DatabaseConfig;
 import com.todo.model.User;
 import com.todo.service.UserService;
 import com.todo.ui.UI;
@@ -7,6 +9,8 @@ import com.todo.service.TodoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -21,7 +25,12 @@ class UIUniTest {
         todoService = mock(TodoService.class);
         ui = new UI(userService, todoService);
         UserService.clearUsers();
+        try (MockedStatic<DatabaseConfig> mockedStatic = mockStatic(DatabaseConfig.class)) {
+            mockedStatic.when(DatabaseConfig::getConnection).thenAnswer(invocation -> {
+                return TestDatabaseConfig.getConnection();
+            });
         }
+    }
 
     @Test
     @DisplayName("Initial State of User Page")
