@@ -128,6 +128,54 @@ class UserServiceUniTest {
         assertThrows(IllegalArgumentException.class,
             () -> userService.registerUser("user1", "pass2"));
     }
+    
+    @Test
+    @DisplayName("Test Database Error in Username Check")
+    void testDatabaseErrorInUsernameCheck() {
+        userService.registerUser("testuser", "password");
+        assertThrows(RuntimeException.class, () -> 
+            userService.isUsernameTaken(null)
+        );
+        assertTrue(userService.isUsernameTaken("testuser"));
+    }
+    
+    @Test
+    @DisplayName("Test Clear Users with Test Exception")
+    void testClearUsersWithTestException() {
+        userService.registerUser("testuser1", "password");
+        userService.registerUser("testuser2", "password");
+        
+        assertTrue(userService.isUsernameTaken("testuser1"));
+        assertTrue(userService.isUsernameTaken("testuser2"));
+        
+        UserService.clearUsers();
+        
+         assertFalse(userService.isUsernameTaken("testuser1"));
+        assertFalse(userService.isUsernameTaken("testuser2"));
+    }
+    
+    @Test
+    @DisplayName("Test Generated Keys Failure in User Registration")
+    void testGeneratedKeysFailure() {
+         String longUsername = "a".repeat(300);
+        assertThrows(RuntimeException.class, () ->
+            userService.registerUser(longUsername, "password")
+        );
+    }
+    
+    @Test
+    @DisplayName("Test Database Error Recovery in Username Check")
+    void testDatabaseErrorRecoveryInUsernameCheck() {
+        userService.registerUser("user1", "password");
+        assertTrue(userService.isUsernameTaken("user1"));
+        
+         assertThrows(RuntimeException.class, () -> 
+            userService.isUsernameTaken(null)
+        );
+        
+        userService.registerUser("user2", "password");
+        assertTrue(userService.isUsernameTaken("user2"));
+    }
 }
 
 

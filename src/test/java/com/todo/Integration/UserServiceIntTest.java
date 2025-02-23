@@ -168,6 +168,37 @@ class UserServiceIntTest {
     }
     
     @Test
+    @DisplayName("Test Concurrent User Login")
+    void testConcurrentUserLogin() throws InterruptedException {
+        // Register initial user
+        userService.registerUser("concurrentuser", "userpass");
+        
+        int numThreads = 10;
+        CountDownLatch latch = new CountDownLatch(numThreads);
+        AtomicInteger successfulLogins = new AtomicInteger(0);
+        
+        for (int i = 0; i < numThreads; i++) {
+            new Thread(() -> {
+                try {
+                    User loggedInUser = userService.login("concurrentuser", "userpass");
+                    if (loggedInUser != null) {
+                        successfulLogins.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    // Login failed
+                } finally {
+                    latch.countDown();
+                }
+            }).start();
+        }
+        
+        latch.await(5, TimeUnit.SECONDS);
+        assertEquals(numThreads, successfulLogins.get(), 
+            "All concurrent logins should succeed");
+    }
+
+    
+    @Test
     @DisplayName("Username Uniqueness Constraint Test")
     void testUsernameUniquenessConstraint() {
         // First registration should succeed
@@ -232,6 +263,47 @@ class UserServiceIntTest {
         assertThrows(IllegalArgumentException.class, () ->
             userService.login("testuser", "")
         );
+    }
+    
+    @Test
+    @DisplayName("Test User Password Update Flow")
+    void testUserPasswordUpdateFlow() {
+        // Register initial user
+        User user = userService.registerUser("passworduser", "oldpassword");
+        assertNotNull(user);
+        
+        // Verify login with old password
+        User loggedInUser = userService.login("passworduser", "oldpassword");
+        assertNotNull(loggedInUser);
+        
+        // Register new user with same username should fail
+        assertThrows(IllegalArgumentException.class, () ->
+            userService.registerUser("passworduser", "differentpassword")
+        );
+        
+        // Verify original user can still login
+        loggedInUser = userService.login("passworduser", "oldpassword");
+        assertNotNull(loggedInUser);
+        assertEquals(user.getUserid(), loggedInUser.getUserid());
+    }
+    
+    @Test
+    @DisplayName("Test User Session Persistence")
+    void testUserSessionPersistence() {
+        // Register user
+        User user = userService.registerUser("sessionuser", "sessionpass");
+        assertNotNull(user);
+        
+        // Create new service instance
+        UserService newUserService = new UserService();
+        
+        // Verify user exists in new service instance
+        assertTrue(newUserService.isUsernameTaken("sessionuser"));
+        
+        // Verify can login with new service instance
+        User loggedInUser = newUserService.login("sessionuser", "sessionpass");
+        assertNotNull(loggedInUser);
+        assertEquals(user.getUserid(), loggedInUser.getUserid());
     }
 
     @Test

@@ -170,46 +170,43 @@ class TodoUIIntTest
         }
     }
 
+    
     @Test
     void testUpdateMultipleFields() {
         try {
-            final CountDownLatch addLatch = new CountDownLatch(1);
-            final CountDownLatch updateLatch = new CountDownLatch(1);
-
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    titleField.setText("Original Title");
-                    descriptionField.setText("Original Description");
-                    dateField.setText(LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-                    priorityComboBox.setSelectedItem(Priority.LOW);
-                    tagsComboBox.setSelectedItem(Tags.Work);
-                    addButton.doClick();
-                    addLatch.countDown();
-                } catch (Exception e) {
-                    fail(e.getMessage());
-                }
+            // First add a todo
+            SwingUtilities.invokeAndWait(() -> {
+                titleField.setText("Original Title");
+                descriptionField.setText("Original Description");
+                dateField.setText(LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+                priorityComboBox.setSelectedItem(Priority.LOW);
+                tagsComboBox.setSelectedItem(Tags.Work);
+                addButton.doClick();
             });
 
-            assertTrue(addLatch.await(5, TimeUnit.SECONDS));
+            // Wait for the add operation to complete
             Thread.sleep(1000);
 
-            SwingUtilities.invokeLater(() -> {
-                try {
-                    todoTable.setRowSelectionInterval(0, 0);
-                    titleField.setText("Updated Title");
-                    descriptionField.setText("Updated Description");
-                    dateField.setText(LocalDate.now().plusDays(5).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-                    priorityComboBox.setSelectedItem(Priority.HIGH);
-                    updateButton.doClick();
-                    updateLatch.countDown();
-                } catch (Exception e) {
-                    fail(e.getMessage());
-                }
+            // Verify the todo was added
+            SwingUtilities.invokeAndWait(() -> {
+                assertEquals(1, todoTable.getRowCount(), "Todo should be added");
+                assertEquals("Original Title", todoTable.getValueAt(0, 1));
             });
 
-            assertTrue(updateLatch.await(5, TimeUnit.SECONDS));
+            // Update the todo
+            SwingUtilities.invokeAndWait(() -> {
+                todoTable.setRowSelectionInterval(0, 0);
+                titleField.setText("Updated Title");
+                descriptionField.setText("Updated Description");
+                dateField.setText(LocalDate.now().plusDays(5).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+                priorityComboBox.setSelectedItem(Priority.HIGH);
+                updateButton.doClick();
+            });
+
+            // Wait for the update operation to complete
             Thread.sleep(1000);
 
+            // Verify the update
             SwingUtilities.invokeAndWait(() -> {
                 assertEquals("Updated Title", todoTable.getValueAt(0, 1));
                 assertEquals("Updated Description", todoTable.getValueAt(0, 2));

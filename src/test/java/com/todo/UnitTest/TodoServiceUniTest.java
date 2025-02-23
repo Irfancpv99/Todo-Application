@@ -4,6 +4,7 @@ import com.todo.model.Todo;
 import com.todo.service.TodoService;
 import com.todo.model.Priority;
 import com.todo.model.Tags;
+import com.todo.model.Status;
 import com.todo.config.DatabaseConfig;
 import org.junit.jupiter.api.*;
 import java.time.LocalDate;
@@ -187,5 +188,175 @@ class TodoServiceUniTest {
         assertFalse(result);
     }
     
+    @Test
+    @DisplayName("Test Todo Priority Updates")
+    void testTodoPriorityUpdates() {
+        // Create initial todo with LOW priority
+        Todo todo = todoService.createTodo(
+            1,
+            TEST_USER_ID,
+            "Priority Test",
+            "Test Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        
+        // Update to MEDIUM priority
+        todo = todoService.updateTodo(
+            todo.getId(),
+            TEST_USER_ID,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            Priority.MEDIUM,
+            todo.getTags(),
+            false
+        );
+        assertEquals(Priority.MEDIUM, todo.getPriority());
+        
+        // Update to HIGH priority
+        todo = todoService.updateTodo(
+            todo.getId(),
+            TEST_USER_ID,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            Priority.HIGH,
+            todo.getTags(),
+            false
+        );
+        assertEquals(Priority.HIGH, todo.getPriority());
+    }
     
+    @Test
+    @DisplayName("Test Todo Tag Updates")
+    void testTodoTagUpdates() {
+        // Create todo with Work tag
+        Todo todo = todoService.createTodo(
+            1,
+            TEST_USER_ID,
+            "Tag Test",
+            "Test Description",
+            LocalDate.now(),
+            Priority.MEDIUM,
+            Tags.Work
+        );
+        
+        // Update to Home tag
+        todo = todoService.updateTodo(
+            todo.getId(),
+            TEST_USER_ID,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            Tags.Home,
+            false
+        );
+        assertEquals(Tags.Home, todo.getTags());
+        
+        // Update to Urgent tag
+        todo = todoService.updateTodo(
+            todo.getId(),
+            TEST_USER_ID,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            Tags.Urgent,
+            false
+        );
+        assertEquals(Tags.Urgent, todo.getTags());
+    }
+
+    @Test
+    @DisplayName("Test Todo Due Date Validation")
+    void testTodoDueDateValidation() {
+        // Create todo with future date
+        LocalDate futureDate = LocalDate.now().plusDays(7);
+        Todo todo = todoService.createTodo(
+            1,
+            TEST_USER_ID,
+            "Date Test",
+            "Test Description",
+            futureDate,
+            Priority.LOW,
+            Tags.Work
+        );
+        assertEquals(futureDate, todo.getDueDate());
+        
+        // Update with new future date
+        LocalDate newFutureDate = LocalDate.now().plusDays(14);
+        todo = todoService.updateTodo(
+            todo.getId(),
+            TEST_USER_ID,
+            todo.getTitle(),
+            todo.getDescription(),
+            newFutureDate,
+            todo.getPriority(),
+            todo.getTags(),
+            false
+        );
+        assertEquals(newFutureDate, todo.getDueDate());
+    }
+    
+    @Test
+    @DisplayName("Test Todo Status Flow")
+    void testTodoStatusFlow() {
+        Todo todo = todoService.createTodo(
+            1, TEST_USER_ID, "Test Todo", "Description",
+            LocalDate.now(), Priority.MEDIUM, Tags.Work
+        );
+        assertFalse(todo.isCompleted());
+        
+
+        todo = todoService.updateTodo(
+            todo.getId(), TEST_USER_ID, todo.getTitle(),
+            todo.getDescription(), todo.getDueDate(),
+            todo.getPriority(), todo.getTags(), true
+        );
+        assertTrue(todo.isCompleted());
+        assertEquals(Status.COMPLETED, todo.getStatus());
+        
+        todo = todoService.updateTodo(
+            todo.getId(), TEST_USER_ID, todo.getTitle(),
+            todo.getDescription(), todo.getDueDate(),
+            todo.getPriority(), todo.getTags(), false
+        );
+        assertFalse(todo.isCompleted());
+        assertEquals(Status.PENDING, todo.getStatus());
+    }
+
+    @Test
+    @DisplayName("Test Todo Description Length Handling")
+    void testTodoDescriptionLengthHandling() {
+        String validDescription = "a".repeat(50);
+        Todo todo = todoService.createTodo(
+            1,
+            TEST_USER_ID,
+            "Description Test",
+            validDescription,
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        assertNotNull(todo);
+        assertEquals(validDescription, todo.getDescription());
+        
+        // Test with too long description (60 chars)
+        String tooLongDescription = "a".repeat(60);
+        assertThrows(RuntimeException.class, () -> {
+            todoService.createTodo(
+                2,
+                TEST_USER_ID,
+                "Long Description Test",
+                tooLongDescription,
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
+        
+        });
+    }
 }

@@ -18,14 +18,24 @@ public class TodoService {
 	private int nextUserSpecificId = 1;
 
 	public Todo createTodo(int userSpecificId, int userId, String title, String description, LocalDate dueDate, Priority priority, Tags tag) {
+		
+		if (title == null) {
+	        throw new IllegalArgumentException("Title cannot be null");
+	    }
+		
+		if (description == null) {
+	        throw new IllegalArgumentException("Description cannot be null");
+	    }
+		
+		if (dueDate == null) {
+	        throw new IllegalArgumentException("DueDate cannot be null");
+	    }
+		
 		if (tag == null) {
 	        throw new IllegalArgumentException("Tag cannot be null");
 	    }
 		if (priority == null) {
 	        throw new IllegalArgumentException("Priority cannot be null");
-	    }
-		if (dueDate == null) {
-	        throw new IllegalArgumentException("DueDate cannot be null");
 	    }
 		
 		try (Connection conn = DatabaseConfig.getConnection()) {

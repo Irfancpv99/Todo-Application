@@ -310,9 +310,79 @@ class TodoServiceIntTest {
     }
     
     @Test
+    @DisplayName("Test Transaction Isolation in Concurrent Updates")
+    void testTransactionIsolation() throws InterruptedException {
+        // Create initial todo
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Original Todo",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        
+        CountDownLatch latch = new CountDownLatch(2);
+        AtomicInteger successCount = new AtomicInteger(0);
+        
+        // Thread 1: Update title
+        new Thread(() -> {
+            try {
+                todoService.updateTodo(
+                    todo.getId(),
+                    userId,
+                    "Updated by Thread 1",
+                    todo.getDescription(),
+                    todo.getDueDate(),
+                    todo.getPriority(),
+                    todo.getTags(),
+                    false
+                );
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+               
+            } finally {
+                latch.countDown();
+            }
+        }).start();
+        
+        // Thread 2: Update description
+        new Thread(() -> {
+            try {
+                todoService.updateTodo(
+                    todo.getId(),
+                    userId,
+                    todo.getTitle(),
+                    "Updated by Thread 2",
+                    todo.getDueDate(),
+                    todo.getPriority(),
+                    todo.getTags(),
+                    false
+                );
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+             
+            } finally {
+                latch.countDown();
+            }
+        }).start();
+        
+        latch.await(5, TimeUnit.SECONDS);
+        
+        // Verify final state
+        Todo finalTodo = todoService.getTodoById(todo.getId());
+        assertNotNull(finalTodo);
+        assertTrue(
+            finalTodo.getTitle().equals("Updated by Thread 1") ||
+            finalTodo.getDescription().equals("Updated by Thread 2")
+        );
+    }
+    
+    @Test
     @DisplayName("Edge Cases in Todo Status Updates")
     void testTodoStatusEdgeCases() {
-        // Create a todo
+    
         var todo = todoService.createTodo(
             1,
             userId,
@@ -346,6 +416,43 @@ class TodoServiceIntTest {
             false
         );
         assertEquals(Status.PENDING, todo.getStatus());
+    }
+    
+    @Test
+    @DisplayName("Test Complex Transaction Rollback Scenarios")
+    void testComplexTransactionRollback() {
+        
+        Todo validTodo = todoService.createTodo(
+            1,
+            userId,
+            "Valid Todo",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        assertNotNull(validTodo);
+        
+        int invalidUserId = -999;
+        assertThrows(RuntimeException.class, () -> {
+            todoService.createTodo(
+                2,
+                invalidUserId,
+                "Invalid Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
+        });
+        
+     
+        Todo retrievedTodo = todoService.getTodoById(validTodo.getId());
+        assertNotNull(retrievedTodo);
+        assertEquals("Valid Todo", retrievedTodo.getTitle());
+        
+        List<Todo> invalidUserTodos = todoService.getTodosByUserId(invalidUserId);
+        assertTrue(invalidUserTodos.isEmpty());
     }
     
     @Test
@@ -516,17 +623,53 @@ class TodoServiceIntTest {
     }
     
     @Test
-    @DisplayName("Test Todo Creation with Invalid Tags")
-    void testCreateTodoWithInvalidTags() {
+    @DisplayName("Test Todo Creation with Invalid Title")
+    void testCreateTodoWithInvalidTitle() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            todoService.createTodo(
+                1,
+                userId,
+                null,
+                "Description",
+                LocalDate.now(),
+                Priority.MEDIUM,
+                Tags.Urgent
+                
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Todo Creation with Invalid Description")
+    void testCreateTodoWithInvalidDescription() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            todoService.createTodo(
+                1,
+                userId,
+                "Test Todo",
+                null,
+                LocalDate.now(),
+                Priority.MEDIUM,
+                Tags.Urgent
+                
+            );
+        });
+    }
+    
+    
+    @Test
+    @DisplayName("Test Todo Creation with Invalid Due Date")
+    void testCreateTodoWithInvalidDueDate() {
         assertThrows(IllegalArgumentException.class, () -> {
             todoService.createTodo(
                 1,
                 userId,
                 "Test Todo",
                 "Description",
-                LocalDate.now(),
-                Priority.LOW,
-                null
+                null,
+                Priority.MEDIUM,
+                Tags.Urgent
+                
             );
         });
     }
@@ -549,18 +692,17 @@ class TodoServiceIntTest {
     }
     
     @Test
-    @DisplayName("Test Todo Creation with Invalid Due Date")
-    void testCreateTodoWithInvalidDueDate() {
+    @DisplayName("Test Todo Creation with Invalid Tags")
+    void testCreateTodoWithInvalidTags() {
         assertThrows(IllegalArgumentException.class, () -> {
             todoService.createTodo(
                 1,
                 userId,
                 "Test Todo",
                 "Description",
-                null,
-                Priority.MEDIUM,
-                Tags.Urgent
-                
+                LocalDate.now(),
+                Priority.LOW,
+                null
             );
         });
     }
@@ -627,5 +769,21 @@ class TodoServiceIntTest {
         );
     }
     
-    
+    @Test
+    @DisplayName("Test User Specific ID Edge Cases")
+    void testUserSpecificIdEdgeCases() {
+    	
+        todoService.setNextUserSpecificId(Integer.MAX_VALUE);
+        int maxId = todoService.getNextUserSpecificId();
+        assertEquals(Integer.MAX_VALUE, maxId);
+       
+        todoService.setNextUserSpecificId(Integer.MIN_VALUE);
+        int minId = todoService.getNextUserSpecificId();
+        assertEquals(Integer.MIN_VALUE, minId);
+       
+        todoService.setNextUserSpecificId(1);
+        assertEquals(1, todoService.getNextUserSpecificId());
+        assertEquals(2, todoService.getNextUserSpecificId());
+        assertEquals(3, todoService.getNextUserSpecificId());
+    }
 }

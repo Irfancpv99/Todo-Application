@@ -68,6 +68,7 @@ public class UserService {
     }
 
     public boolean isUsernameTaken(String username) {
+    	
     	if (username == null) {
             throw new RuntimeException("Username cannot be null");
         }
