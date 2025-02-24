@@ -4,6 +4,9 @@ import com.todo.config.DatabaseConfig;
 import com.todo.config.PropertiesLoader;
 import com.zaxxer.hikari.HikariDataSource;
 import org.junit.jupiter.api.*;
+
+
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.sql.Connection;
@@ -360,5 +363,185 @@ class DatabaseConfigTest {
         assertNotNull(conn2);
         assertFalse(conn2.isClosed());
         conn2.close();
+    }
+    
+    @Test
+    @DisplayName("Test database configuration getters")
+    void testDbConfigGetters() throws Exception {
+        // Access the private methods using reflection
+        Method getDbUrlMethod = DatabaseConfig.class.getDeclaredMethod("getDbUrl");
+        Method getDbUsernameMethod = DatabaseConfig.class.getDeclaredMethod("getDbUsername");
+        Method getDbPasswordMethod = DatabaseConfig.class.getDeclaredMethod("getDbPassword");
+        
+        getDbUrlMethod.setAccessible(true);
+        getDbUsernameMethod.setAccessible(true);
+        getDbPasswordMethod.setAccessible(true);
+        
+        // Set the properties for testing
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "test_url");
+        properties.setProperty("db.username", "test_user");
+        properties.setProperty("db.password", "test_pass");
+        
+        // Execute the methods and verify results
+        assertEquals("test_url", getDbUrlMethod.invoke(null), "getDbUrl should return correct value");
+        assertEquals("test_user", getDbUsernameMethod.invoke(null), "getDbUsername should return correct value");
+        assertEquals("test_pass", getDbPasswordMethod.invoke(null), "getDbPassword should return correct value");
+    }
+    
+    // Test closed datasource in getConnection
+    @Test
+    @DisplayName("Test getConnection with closed dataSource")
+    void testGetConnectionWithClosedDataSource() throws Exception {
+        // Initialize first
+        DatabaseConfig.initialize();
+        
+        // Get the dataSource field
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        // Create a mock dataSource
+        HikariDataSource mockDataSource = mock(HikariDataSource.class);
+        when(mockDataSource.isClosed()).thenReturn(true);
+        when(mockDataSource.getConnection()).thenReturn(mock(Connection.class));
+        
+        // Save original and replace with mock
+        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+        dataSourceField.set(null, mockDataSource);
+        
+        try {
+            // This should reinitialize since the mock datasource is "closed"
+            Connection conn = DatabaseConfig.getConnection();
+            assertNotNull(conn, "Should get a connection");
+            
+            // Verify isClosed was called
+            verify(mockDataSource).isClosed();
+        } finally {
+            // Restore original
+            dataSourceField.set(null, originalDataSource);
+        }
+    }
+    
+    // Test with null dataSource
+    @Test
+    @DisplayName("Test getConnection with null dataSource")
+    void testGetConnectionWithNullDataSource() throws Exception {
+        // Get the dataSource field
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        // Save original and set to null
+        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+        dataSourceField.set(null, null);
+        
+        try {
+            // This should initialize since dataSource is null
+            assertDoesNotThrow(() -> {
+                try (Connection conn = DatabaseConfig.getConnection()) {
+                    assertNotNull(conn, "Should get a connection after initialization");
+                }
+            });
+        } finally {
+            // Close any new pool created
+            DatabaseConfig.closePool();
+            
+            // Restore original
+            dataSourceField.set(null, originalDataSource);
+        }
+    }
+    
+    // Test all branches of closePool
+    @Test
+    @DisplayName("Test all branches of closePool")
+    void testAllClosePoolBranches() throws Exception {
+        // Test with null dataSource
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        // Save original
+        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+        
+        // Test null datasource
+        dataSourceField.set(null, null);
+        assertDoesNotThrow(() -> DatabaseConfig.closePool(), 
+            "closePool should handle null dataSource");
+        
+        // Test closed datasource
+        HikariDataSource mockClosedDataSource = mock(HikariDataSource.class);
+        when(mockClosedDataSource.isClosed()).thenReturn(true);
+        dataSourceField.set(null, mockClosedDataSource);
+        
+        assertDoesNotThrow(() -> DatabaseConfig.closePool(), 
+            "closePool should handle already closed dataSource");
+        verify(mockClosedDataSource).isClosed();
+        verify(mockClosedDataSource, never()).close();
+        
+        // Test open datasource
+        HikariDataSource mockOpenDataSource = mock(HikariDataSource.class);
+        when(mockOpenDataSource.isClosed()).thenReturn(false);
+        dataSourceField.set(null, mockOpenDataSource);
+        
+        assertDoesNotThrow(() -> DatabaseConfig.closePool(), 
+            "closePool should handle open dataSource");
+        verify(mockOpenDataSource).isClosed();
+        verify(mockOpenDataSource).close();
+        
+        // Restore original
+        dataSourceField.set(null, originalDataSource);
+    }
+    
+    // Test database initialization failure
+    @Test
+    @DisplayName("Test database initialization failure")
+    void testDatabaseInitializationFailure() throws Exception {
+        Properties properties = (Properties) propsField.get(null);
+        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/nonexistentdb");
+        
+        // This should throw an exception
+        Exception exception = assertThrows(RuntimeException.class, 
+            () -> DatabaseConfig.initialize());
+        
+        // Just assert that we got an exception with some message
+        assertNotNull(exception.getMessage(), "Exception should have a message");
+    }
+    
+    // Test SQLException in getConnection
+    @Test
+    @DisplayName("Test SQLException in getConnection")
+    void testSQLExceptionInGetConnection() throws Exception {
+        // Get the dataSource field
+        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
+        dataSourceField.setAccessible(true);
+        
+        // Create a mock dataSource that throws SQLException
+        HikariDataSource mockDataSource = mock(HikariDataSource.class);
+        when(mockDataSource.isClosed()).thenReturn(false);
+        when(mockDataSource.getConnection()).thenThrow(new SQLException("Test exception"));
+        
+        // Save original and replace with mock
+        HikariDataSource originalDataSource = (HikariDataSource) dataSourceField.get(null);
+        dataSourceField.set(null, mockDataSource);
+        
+        try {
+            // This should throw SQLException
+            assertThrows(SQLException.class, 
+                () -> DatabaseConfig.getConnection());
+            
+            // Verify getConnection was called
+            verify(mockDataSource).getConnection();
+        } finally {
+            // Restore original
+            dataSourceField.set(null, originalDataSource);
+        }
+    }
+    
+    // Test the private constructor for coverage
+    @Test
+    @DisplayName("Test private constructor for coverage")
+    void testPrivateConstructor() throws Exception {
+        Constructor<DatabaseConfig> constructor = DatabaseConfig.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        DatabaseConfig instance = constructor.newInstance();
+        assertNotNull(instance, "Should create instance");
     }
 }

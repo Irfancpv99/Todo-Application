@@ -18,7 +18,10 @@ class TodoUniTest {
 
     @BeforeEach
     void setUp() {
-        dueDate = LocalDate.now().plusDays(1); 
+        dueDate = LocalDate.now().plusDays(1);
+        dueDate = LocalDate.now().plusDays(1);
+        todo = new Todo(1, 1, "Task", "Description", dueDate, Priority.HIGH, Tags.Home);
+    
     }
 
     @Test
@@ -173,6 +176,34 @@ class TodoUniTest {
         todo = new Todo(1, 1, "Task", "Description", dueDate, Priority.HIGH, Tags.Home);
         todo.setTags(Tags.Work);
         assertEquals(Tags.Work, todo.getTags());
+    }
+    
+    @Test
+    @DisplayName("Test setUserId method")
+    void testSetUserId() {
+        assertEquals(0, todo.getUserId());
+        
+        todo.setUserId(2);
+        
+        assertEquals(2, todo.getUserId());
+    }
+    
+    @Test
+    @DisplayName("Test getUserSpecificId and setUserSpecificId methods")
+    void testUserSpecificId() {
+        assertEquals(0, todo.getUserSpecificId());
+        
+        todo.setUserSpecificId(5);
+        
+         assertEquals(5, todo.getUserSpecificId());
+    }
+    
+    @Test
+    @DisplayName("Test validateAndSetTags with null tag")
+    void testValidateAndSetTagsWithNull() {
+       assertThrows(IllegalArgumentException.class, () -> 
+            todo.setTags(null)
+        );
     }
     
 	}

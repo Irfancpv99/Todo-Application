@@ -163,4 +163,43 @@ class UserUniTest {
 	        assertTrue(user2.getUserid() > user1.getUserid());
 	    }
 	    
+	    @Test
+	    @DisplayName("User login should fail with null username")
+	    void testLoginFailsWithNullUsername() {
+	        User user = new User(1, "validuser", "validPassword123");
+	        
+	        assertFalse(user.login(null, "validPassword123"));
+	    }
+	    
+	    @Test
+	    @DisplayName("User login should fail with null password")
+	    void testLoginFailsWithNullPassword() {
+	        User user = new User(1, "validuser", "validPassword123");
+	        
+	        assertFalse(user.login("validuser", null));
+	    }
+
+	    @Test
+	    @DisplayName("User login should fail when both username and password are null")
+	    void testLoginFailsWithBothNull() {
+	        User user = new User(1, "validuser", "validPassword123");
+	        
+	        assertFalse(user.login(null, null));
+	    }
+
+	    @Test
+	    @DisplayName("User login should fail with correct username but wrong password")
+	    void testLoginFailsWithCorrectUsernameWrongPassword() {
+	        User user = new User(1, "validuser", "validPassword123");
+	        
+	        assertFalse(user.login("validuser", "wrongPassword"));
+	    }
+
+	    @Test
+	    @DisplayName("User login should fail with wrong username but correct password")
+	    void testLoginFailsWithWrongUsernameCorrectPassword() {
+	        User user = new User(1, "validuser", "validPassword123");
+	        
+	        assertFalse(user.login("wronguser", "validPassword123"));
+	    }
 }

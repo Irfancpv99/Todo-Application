@@ -29,6 +29,26 @@ public class TodoUIe2eTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        // First, try to clean up any leftover TestUser from previous test runs
+        try (Connection conn = DatabaseConfig.getConnection()) {
+            // Start transaction
+            conn.setAutoCommit(false);
+            
+            // First delete todos for any existing TestUser
+            conn.createStatement().execute(
+                "DELETE FROM todos WHERE user_id IN (SELECT id FROM users WHERE username='TestUser')");
+            
+            // Then delete any existing TestUser
+            conn.createStatement().execute("DELETE FROM users WHERE username='TestUser'");
+            
+            // Commit the transaction
+            conn.commit();
+        } catch (Exception e) {
+            // Just log the error, don't fail the test
+            System.err.println("Error cleaning up before test: " + e.getMessage());
+        }
+        
+        // Now proceed with normal setup
         UserService userService = new UserService();
         int userId = userService.registerUser("TestUser", "password").getUserid();
         
@@ -38,19 +58,33 @@ public class TodoUIe2eTest {
             todoUI.setVisible(true);
         });
     }
-    
+
     @AfterEach
     void tearDown() throws Exception {
         try (Connection conn = DatabaseConfig.getConnection()) {
-            conn.createStatement().execute("DELETE FROM todos");
-            conn.createStatement().execute("DELETE FROM users");
+            try {
+                // Start transaction
+                conn.setAutoCommit(false);
+                
+                // First delete todos for the test user
+                conn.createStatement().execute(
+                    "DELETE FROM todos WHERE user_id IN (SELECT id FROM users WHERE username='TestUser')");
+                
+                // Then delete the user
+                conn.createStatement().execute("DELETE FROM users WHERE username='TestUser'");
+                
+                // Commit the transaction
+                conn.commit();
+            } catch (Exception e) {
+                // Log error but don't fail test cleanup
+                System.err.println("Error cleaning up after test: " + e.getMessage());
+            }
         }
         
         SwingUtilities.invokeAndWait(() -> {
             if (todoUI != null) todoUI.dispose();
         });
     }
-
     @Test
     @DisplayName("Add a New Todo")
     void testAddTodo() throws Exception {

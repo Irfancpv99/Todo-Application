@@ -29,8 +29,8 @@ public class TodoUI extends JFrame {
     private JButton addButton;
     private JButton updateButton;
     private JButton deleteButton;
-    private JButton logoutButton; // New logout button
-    private JLabel usernameLabel; // New JLabel for username
+    private JButton logoutButton; 
+    private JLabel usernameLabel; 
     private JButton markCompletedButton;
     private JComboBox<Priority> filterPriorityComboBox;
     private List<Todo> currentTodos;
@@ -49,6 +49,7 @@ public class TodoUI extends JFrame {
         setLayout(new BorderLayout(10, 10));
         
      // Create a panel for the username label
+        
         JPanel headerPanel = new JPanel();
         usernameLabel = new JLabel("Logged in as: " + username);
         headerPanel.add(usernameLabel);
