@@ -8,7 +8,11 @@ import com.todo.ui.TodoUI;
 import com.todo.ui.UI;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+
 import java.awt.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -116,6 +120,51 @@ public class TodoUIe2eTest {
             assertEquals("HIGH", todoTable.getValueAt(0, 4).toString(), "Priority should be updated.");
         });
         Thread.sleep(500);
+    }
+    
+    @Test
+    @DisplayName("Test Add Todo in Update Mode")
+    void testAddTodoInUpdateMode() throws Exception {
+  
+        SwingUtilities.invokeAndWait(() -> addTestTodo("First Todo", "Description", "2025-10-10", Priority.MEDIUM, Tags.Home));
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            JTable todoTable = getTodoTable();
+            todoTable.setRowSelectionInterval(0, 0);
+            
+            setPrivateField(todoUI, "isUpdateMode", true);
+            
+            setTodoFields("Second Todo", "Another Description", "2025-11-10", Priority.HIGH, Tags.Work);
+            getAddButton().doClick();
+        });
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(1, getTodoTable().getRowCount(), 
+                "Should not be able to add todo while in update mode");
+            
+            setPrivateField(todoUI, "isUpdateMode", false);
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Add Todo with Empty Title or Description")
+    void testAddTodoWithEmptyFields() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            setTodoFields("", "Test Description", "2025-10-10", Priority.HIGH, Tags.Work);
+            getAddButton().doClick();
+        });
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(0, getTodoTable().getRowCount(), "Todo with empty title should not be added");
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            setTodoFields("Test Title", "", "2025-10-10", Priority.HIGH, Tags.Work);
+            getAddButton().doClick();
+        });
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(0, getTodoTable().getRowCount(), "Todo with empty description should not be added");
+        });
     }
 
     @Test
@@ -227,6 +276,91 @@ public class TodoUIe2eTest {
             assertTrue(loginUIVisible, "Login UI should be displayed after logout.");
         });
     }
+    
+    @Test
+    @DisplayName("Test Selection Listener")
+    void testSelectionListener() throws Exception {
+ 
+        SwingUtilities.invokeAndWait(() -> addTestTodo("Selection Test", "Test Description", "2025-10-10", Priority.HIGH, Tags.Work));
+        Thread.sleep(300);
+
+        SwingUtilities.invokeAndWait(() -> {
+            getTitleField().setText("");
+            getDescriptionField().setText("");
+            getDateField().setText("");
+        });
+        Thread.sleep(300);
+        
+        SwingUtilities.invokeAndWait(() -> {
+            JTable todoTable = getTodoTable();
+            
+            // Make a selection while fields are empty
+            todoTable.setRowSelectionInterval(0, 0);
+        });
+        Thread.sleep(300);
+        
+       SwingUtilities.invokeAndWait(() -> {
+            assertFalse(getTitleField().getText().isEmpty(), 
+                "Fields should be populated after selection");
+            assertEquals("Selection Test", getTitleField().getText(),
+                "Title should match the todo");
+            
+            getTitleField().setText("");
+            getDescriptionField().setText("");
+            getDateField().setText("");
+        });
+        Thread.sleep(300);
+        
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                Method method = TodoUI.class.getDeclaredMethod("populateFieldsFromSelectedRow");
+                method.setAccessible(true);
+                method.invoke(todoUI);
+            } catch (Exception e) {
+                fail("Failed to invoke populateFieldsFromSelectedRow: " + e.getMessage());
+            }
+        });
+        Thread.sleep(300);
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("Selection Test", getTitleField().getText(),
+                "Title field should be populated after direct method call");
+        });
+    }
+    
+    @Test
+    @DisplayName("Test TableModel isCellEditable Method")
+    void testTableModelIsCellEditable() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            DefaultTableModel model = (DefaultTableModel) getTodoTable().getModel();
+            for (int row = 0; row < Math.max(1, model.getRowCount()); row++) {
+                for (int col = 0; col < model.getColumnCount(); col++) {
+                    assertFalse(model.isCellEditable(row, col), 
+                            "Table cells should not be editable");
+                }
+            }
+        });
+    }
+    
+    @Test
+    @DisplayName("Test Simulate IllegalArgumentException in Add Todo")
+    void testAddTodoIllegalArgumentException() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            TodoService testService = new TodoService() {
+                @Override
+                public com.todo.model.Todo createTodo(int id, int userId, String title, String description, 
+                                              LocalDate dueDate, Priority priority, Tags tag) {
+                    throw new IllegalArgumentException("Test exception");
+                }
+            };
+           setPrivateField(todoUI, "todoService", testService);
+            setTodoFields("Exception Test", "Test Description", "2025-10-10", Priority.HIGH, Tags.Work);
+            getAddButton().doClick();
+        });
+        Thread.sleep(300);
+         SwingUtilities.invokeAndWait(() -> {
+            setPrivateField(todoUI, "todoService", todoService);
+        });
+    }
 
     // Utility Methods
     
@@ -327,6 +461,16 @@ public class TodoUIe2eTest {
             return field.get(todoUI);
         } catch (Exception e) {
             throw new RuntimeException("Failed to access field: " + fieldName, e);
+        }
+    }
+    
+    private void setPrivateField(Object obj, String fieldName, Object value) {
+        try {
+            Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(obj, value);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to set field: " + fieldName, e);
         }
     }
 }

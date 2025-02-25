@@ -13,17 +13,18 @@ import javax.swing.*;
 
 import java.awt.Container;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-
-
+import javax.swing.table.DefaultTableModel;
 
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
+
 
 class TodoUIUnitTest {
     private TodoUI todoUI;
@@ -38,38 +39,31 @@ class TodoUIUnitTest {
     private JComboBox<Priority> priorityComboBox;
     private JComboBox<Tags> tagsComboBox;
     private JTable todoTable;
+    private DefaultTableModel tableModel;
+    private JButton addButton;
+    private JButton updateButton;
+    private JButton deleteButton;
+    private JButton markCompletedButton;
 
     @SuppressWarnings("unchecked")
 	@BeforeEach
-    void setUp() {
+	void setUp() {
         closeable = MockitoAnnotations.openMocks(this);
-        todoUI = new TodoUI(todoService, "TestUser",1);
+        todoUI = new TodoUI(todoService, "TestUser", 1);
         
         // Get references to UI components using reflection
         try {
-            java.lang.reflect.Field titleFieldField = TodoUI.class.getDeclaredField("titleField");
-            titleFieldField.setAccessible(true);
-            titleField = (JTextField) titleFieldField.get(todoUI);
-
-            java.lang.reflect.Field descFieldField = TodoUI.class.getDeclaredField("descriptionField");
-            descFieldField.setAccessible(true);
-            descriptionField = (JTextField) descFieldField.get(todoUI);
-
-            java.lang.reflect.Field dateFieldField = TodoUI.class.getDeclaredField("dateField");
-            dateFieldField.setAccessible(true);
-            dateField = (JTextField) dateFieldField.get(todoUI);
-
-            java.lang.reflect.Field priorityField = TodoUI.class.getDeclaredField("priorityComboBox");
-            priorityField.setAccessible(true);
-            priorityComboBox = (JComboBox<Priority>) priorityField.get(todoUI);
-
-            java.lang.reflect.Field tagsField = TodoUI.class.getDeclaredField("tagsComboBox");
-            tagsField.setAccessible(true);
-            tagsComboBox = (JComboBox<Tags>) tagsField.get(todoUI);
-
-            java.lang.reflect.Field tableField = TodoUI.class.getDeclaredField("todoTable");
-            tableField.setAccessible(true);
-            todoTable = (JTable) tableField.get(todoUI);
+            titleField = getPrivateField(todoUI, "titleField", JTextField.class);
+            descriptionField = getPrivateField(todoUI, "descriptionField", JTextField.class);
+            dateField = getPrivateField(todoUI, "dateField", JTextField.class);
+            priorityComboBox = getPrivateField(todoUI, "priorityComboBox", JComboBox.class);
+            tagsComboBox = getPrivateField(todoUI, "tagsComboBox", JComboBox.class);
+            todoTable = getPrivateField(todoUI, "todoTable", JTable.class);
+            tableModel = getPrivateField(todoUI, "tableModel", DefaultTableModel.class);
+            addButton = findButtonByText(todoUI, "Add");
+            updateButton = findButtonByText(todoUI, "Update");
+            deleteButton = findButtonByText(todoUI, "Delete");
+            markCompletedButton = findButtonByText(todoUI, "Mark Completed");
         } catch (Exception e) {
             fail("Failed to set up test: " + e.getMessage());
         }
@@ -155,6 +149,97 @@ class TodoUIUnitTest {
         verify(todoService).updateTodo(eq(1), anyInt(), eq("Updated Todo"), eq("Updated Description"), 
                 any(LocalDate.class), any(Priority.class), any(Tags.class), eq(false));
     }
+    
+    @Test
+    @DisplayName("Test Add Todo When In Update Mode")
+    void testAddTodoInUpdateMode() {
+        setPrivateField(todoUI, "isUpdateMode", true);
+        
+        addButton.doClick();
+        
+         verify(todoService, never()).createTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class)
+        );
+         setPrivateField(todoUI, "isUpdateMode", false);
+    }
+    
+    @Test
+    @DisplayName("Test Add Todo With IllegalArgumentException")
+    void testAddTodoWithIllegalArgumentException() {
+        titleField.setText("Test Todo");
+        descriptionField.setText("Test Description");
+        dateField.setText(LocalDate.now().plusDays(1).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        
+        when(todoService.createTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class)
+        )).thenThrow(new IllegalArgumentException("Test exception"));
+      
+        addButton.doClick();
+      
+        assertEquals("Test Todo", titleField.getText());
+        assertEquals("Test Description", descriptionField.getText());
+    }
+
+    @Test
+    @DisplayName("Test Update Todo With No Selection")
+    void testUpdateTodoWithNoSelection() {
+       
+        todoTable.clearSelection();
+        
+        updateButton.doClick();
+        
+        verify(todoService, never()).updateTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class), anyBoolean()
+        );
+    }
+
+    @Test
+    @DisplayName("Test Update Todo With DateTimeParseException")
+    void testUpdateTodoWithDateTimeParseException() {
+       
+        Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description", 
+                LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+        setupTableWithTestData(testTodo);
+        todoTable.setRowSelectionInterval(0, 0);
+        
+        dateField.setText("invalid-date");
+      
+        updateButton.doClick();
+    
+        verify(todoService, never()).updateTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class), anyBoolean()
+        );
+    }
+
+    @Test
+    @DisplayName("Test Update Todo With IllegalArgumentException")
+    void testUpdateTodoWithIllegalArgumentException() {
+        Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description", 
+                LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+        setupTableWithTestData(testTodo);
+        todoTable.setRowSelectionInterval(0, 0);
+        
+        invokePopulateFieldsFromSelectedRow();
+        assertEquals("Test Todo", titleField.getText(), "Title field should be populated after manual call");
+        titleField.setText("Updated Todo");
+        descriptionField.setText("Updated Description");
+        dateField.setText(LocalDate.now().plusDays(2).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        
+        when(todoService.updateTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class), anyBoolean()
+        )).thenThrow(new IllegalArgumentException("Test exception"));
+        
+        updateButton.doClick();
+        
+        assertEquals("Updated Todo", titleField.getText(), "Fields should retain updated values after exception");
+        assertEquals("Updated Description", descriptionField.getText(), "Fields should retain updated values after exception");
+    }
+    
 
     @Test
     @DisplayName("Delete Todo")
@@ -168,6 +253,35 @@ class TodoUIUnitTest {
         findAndClickButton(todoUI, "Delete");
         verify(todoService).deleteTodoById(1);
     }
+    
+    @Test
+    @DisplayName("Test Delete Todo With No Selection")
+    void testDeleteTodoWithNoSelection() {
+        todoTable.clearSelection();
+        
+        deleteButton.doClick();
+        verify(todoService, never()).deleteTodoById(anyInt());
+    }
+
+    @Test
+    @DisplayName("Test Delete Todo Failure Case")
+    void testDeleteTodoFailureCase() {
+        Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description", 
+                LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+        setupTableWithTestData(testTodo);
+        todoTable.setRowSelectionInterval(0, 0);
+        
+        when(todoService.deleteTodoById(1)).thenReturn(false);
+        
+        reset(todoService);
+        when(todoService.deleteTodoById(1)).thenReturn(false);
+        when(todoService.getTodosByUserId(anyInt())).thenReturn(List.of(testTodo));
+        
+        deleteButton.doClick();
+        verify(todoService).deleteTodoById(1);
+        assertEquals(1, todoTable.getRowCount(), "Todo should still be present after failed deletion");
+    }
+   
 
     @Test
     @DisplayName("Mark Todo As Completed")
@@ -182,7 +296,38 @@ class TodoUIUnitTest {
         verify(todoService).updateTodo(eq(1), anyInt(), anyString(), anyString(), 
                 any(LocalDate.class), any(Priority.class), any(Tags.class), eq(true));
     }
+    
+    @Test
+    @DisplayName("Test Mark Todo As Completed With Null Todo")
+    void testMarkTodoCompletedWithNullTodo() {
+        Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description", 
+                LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+        setupTableWithTestData(testTodo);
+        todoTable.setRowSelectionInterval(0, 0);
+        
+        when(todoService.getTodoById(1)).thenReturn(null);
+        
+        markCompletedButton.doClick();
+        
+         verify(todoService, never()).updateTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class), eq(true)
+        );
+    }
 
+    @Test
+    @DisplayName("Test Mark Todo As Completed With No Selection")
+    void testMarkTodoCompletedWithNoSelection() {
+        todoTable.clearSelection();
+    
+        markCompletedButton.doClick();
+        
+        verify(todoService, never()).updateTodo(
+            anyInt(), anyInt(), anyString(), anyString(), 
+            any(LocalDate.class), any(Priority.class), any(Tags.class), anyBoolean()
+        );
+    }
+    
     @Test
     @DisplayName("Filter Todo By Priority")
     void testFilterByPriority() {
@@ -206,31 +351,26 @@ class TodoUIUnitTest {
     @Test
     @DisplayName("Test Clear Filter Button")
     void testClearFilter() {
-        // Setup initial todos
         List<Todo> todos = Arrays.asList(
             new Todo(1, 1, "High Priority", "Test", LocalDate.now(), Priority.HIGH, Tags.Work),
             new Todo(2, 1, "Low Priority", "Test", LocalDate.now(), Priority.LOW, Tags.Work)
         );
         when(todoService.getTodosByUserId(1)).thenReturn(todos);
         
-        // Apply filter first
         JComboBox<Priority> filterComboBox = findComboBoxByName(todoUI, "filterPriorityComboBox");
         filterComboBox.setSelectedItem(Priority.HIGH);
         findAndClickButton(todoUI, "Apply Filter");
         
-        // Clear filter
         findAndClickButton(todoUI, "Clear Filter");
         
-        // Verify table shows all todos
-        JTable todoTable = (JTable) getPrivateField(todoUI, "todoTable");
+         JTable todoTable = (JTable) getPrivateField(todoUI, "todoTable");
         assertEquals(2, todoTable.getRowCount(), "All todos should be visible after clearing filter");
     }
     
     @Test
     @DisplayName("Test Clear Fields Button")
     void testClearFields() {
-        // Set field values
-        JTextField titleField = (JTextField) getPrivateField(todoUI, "titleField");
+         JTextField titleField = (JTextField) getPrivateField(todoUI, "titleField");
         JTextField descriptionField = (JTextField) getPrivateField(todoUI, "descriptionField");
         JTextField dateField = (JTextField) getPrivateField(todoUI, "dateField");
         
@@ -238,35 +378,37 @@ class TodoUIUnitTest {
         descriptionField.setText("Test Description");
         dateField.setText("2025-01-01");
         
-        // Click clear button
         findAndClickButton(todoUI, "Clear");
         
-        // Verify fields are cleared
-        assertTrue(titleField.getText().isEmpty(), "Title field should be empty");
+         assertTrue(titleField.getText().isEmpty(), "Title field should be empty");
         assertTrue(descriptionField.getText().isEmpty(), "Description field should be empty");
         assertTrue(dateField.getText().isEmpty(), "Date field should be empty");
+    }
+    
+    @Test
+    @DisplayName("Test isCellEditable Method in TableModel")
+    void testIsCellEditable() {
+        assertFalse(tableModel.isCellEditable(0, 0), "Table cells should not be editable");
+        assertFalse(tableModel.isCellEditable(0, 1), "Table cells should not be editable");
     }
     
     @Test
     @DisplayName("Date Format Validation Should Handle Invalid Inputs")
     void testDateFormatValidation() {
         record InvalidDateTest(String date, String description) {}
-        
-        // First add a valid todo
+     
         var titleField = getPrivateField(todoUI, "titleField", JTextField.class);
         var descField = getPrivateField(todoUI, "descriptionField", JTextField.class);
         var dateField = getPrivateField(todoUI, "dateField", JTextField.class);
         var priorityBox = getPrivateField(todoUI, "priorityComboBox", JComboBox.class);
         var tagsBox = getPrivateField(todoUI, "tagsComboBox", JComboBox.class);
         
-        // Set valid values
         titleField.setText("Valid Todo");
         descField.setText("Valid Description");
         dateField.setText("2025-12-31");
         priorityBox.setSelectedItem(Priority.HIGH);
         tagsBox.setSelectedItem(Tags.Work);
         
-        // Add valid todo
         when(todoService.createTodo(
             anyInt(), anyInt(), eq("Valid Todo"), eq("Valid Description"),
             any(LocalDate.class), eq(Priority.HIGH), eq(Tags.Work)))
@@ -275,12 +417,10 @@ class TodoUIUnitTest {
         
         findButtonByText(todoUI, "Add").doClick();
         
-        // Verify valid todo was added
         verify(todoService).createTodo(
             anyInt(), anyInt(), eq("Valid Todo"), eq("Valid Description"),
             any(LocalDate.class), eq(Priority.HIGH), eq(Tags.Work));
         
-        // Now test invalid dates
         var invalidDates = Arrays.asList(
             new InvalidDateTest("01-01-2025", "Wrong format"),
             new InvalidDateTest("2025/01/01", "Wrong separator"),
@@ -289,12 +429,11 @@ class TodoUIUnitTest {
             new InvalidDateTest("202S-01-01", "Non-numeric")
         );
         
-        // Reset verification counts after valid todo
-        reset(todoService);
+         reset(todoService);
         
         for (var testCase : invalidDates) {
-            // Set new invalid date while keeping other fields valid
-            titleField.setText("Test Todo");
+            
+        	titleField.setText("Test Todo");
             descField.setText("Test Description");
             dateField.setText(testCase.date());
             priorityBox.setSelectedItem(Priority.HIGH);
@@ -308,21 +447,104 @@ class TodoUIUnitTest {
             );
         }
     }
-    
+        
+    @Test
+    @DisplayName("Test List Selection Listener")
+    void testListSelectionListener() {
+  
+        Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description",
+                LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+        when(todoService.getTodosByUserId(1)).thenReturn(List.of(testTodo));
+        when(todoService.getTodoById(1)).thenReturn(testTodo);
 
-    
-    
+        invokeRefreshTable();
+        titleField.setText("");
+        descriptionField.setText("");
+        dateField.setText("");
+        todoTable.setRowSelectionInterval(0, 0);
+        assertEquals("Test Todo", titleField.getText(), 
+            "Fields should be populated when a row is selected");
+        titleField.setText("");
+        descriptionField.setText("");
+        dateField.setText("");
+        invokePopulateFieldsFromSelectedRow();
+        assertEquals("Test Todo", titleField.getText(), 
+            "Fields should be populated when populateFieldsFromSelectedRow is called");
+        
+        titleField.setText("");
+        descriptionField.setText("");
+        dateField.setText("");
+        todoTable.clearSelection();
+        
+        invokePopulateFieldsFromSelectedRow();
+        assertEquals("", titleField.getText(), 
+        		  "Fields should remain empty when no row is selected");
+    }
 
+        @Test
+        @DisplayName("Test populateFieldsFromSelectedRow With No Selection")
+        void testPopulateFieldsFromSelectedRowWithNoSelection() {
+            todoTable.clearSelection();
+            
+            invokePopulateFieldsFromSelectedRow();
+            verify(todoService, never()).getTodoById(anyInt());
+
+        }
+
+        @Test
+        @DisplayName("Test populateFieldsFromSelectedRow With Null Todo")
+        void testPopulateFieldsFromSelectedRowWithNullTodo() {
+            Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description", 
+                    LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
+            setupTableWithTestData(testTodo);
+            
+            todoTable.setRowSelectionInterval(0, 0);
+            when(todoService.getTodoById(1)).thenReturn(null);
+            
+            titleField.setText("Unchanged");
+            descriptionField.setText("Unchanged");
+            invokePopulateFieldsFromSelectedRow();
+            
+            assertEquals("Unchanged", titleField.getText(), "Fields should not change if todo is null");
+            assertEquals("Unchanged", descriptionField.getText(), "Fields should not change if todo is null");
+        }
+        
+        @Test
+        @DisplayName("Test main Method")
+        void testMainMethod() {
+            Thread mainThread = new Thread(() -> {
+                TodoUI.main(new String[0]);
+                 try {
+                    Thread.sleep(100);
+                    for (java.awt.Window window : java.awt.Window.getWindows()) {
+                        if (window instanceof TodoUI) {
+                            window.dispose();
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+
+            mainThread.start();
+            try {
+                mainThread.join(2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                fail("Test interrupted");
+            }
+    }
+    
     // Helper methods
+        
     private void setupTableWithTestData(Todo todo) {
         List<Todo> todos = new ArrayList<>();
         todos.add(todo);
         when(todoService.getTodosByUserId(1)).thenReturn(todos);
+        when(todoService.getTodoById(1)).thenReturn(todo);
         invokeRefreshTable();
     }
     
-    
-
     private void invokeRefreshTable() {
         try {
             java.lang.reflect.Method refreshMethod = TodoUI.class.getDeclaredMethod("refreshTable");
@@ -330,6 +552,16 @@ class TodoUIUnitTest {
             refreshMethod.invoke(todoUI);
         } catch (Exception e) {
             fail("Failed to invoke refreshTable: " + e.getMessage());
+        }
+    }
+    
+    private void invokePopulateFieldsFromSelectedRow() {
+        try {
+            Method method = TodoUI.class.getDeclaredMethod("populateFieldsFromSelectedRow");
+            method.setAccessible(true);
+            method.invoke(todoUI);
+        } catch (Exception e) {
+            fail("Failed to invoke populateFieldsFromSelectedRow: " + e.getMessage());
         }
     }
 
@@ -361,6 +593,15 @@ class TodoUIUnitTest {
         } catch (Exception e) {
             fail("Failed to get field: " + fieldName);
             return null;
+        }
+    }
+    private void setPrivateField(Object obj, String fieldName, Object value) {
+        try {
+            Field field = obj.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(obj, value);
+        } catch (Exception e) {
+            fail("Failed to set field: " + fieldName + ", error: " + e.getMessage());
         }
     }
     
