@@ -24,8 +24,8 @@ public class TodoUI extends JFrame {
     private JTextField dateField;
     private JComboBox<Priority> priorityComboBox;
     private JComboBox<Tags> tagsComboBox;
-    private JTable todoTable;
-    private DefaultTableModel tableModel;
+    public JTable todoTable;
+    public DefaultTableModel tableModel;
     private JButton addButton;
     private JButton updateButton;
     private JButton deleteButton;
@@ -35,6 +35,7 @@ public class TodoUI extends JFrame {
     private JComboBox<Priority> filterPriorityComboBox;
     private List<Todo> currentTodos;
     private boolean isUpdateMode = false;
+    
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public TodoUI(TodoService todoService,  String username,int userId) {

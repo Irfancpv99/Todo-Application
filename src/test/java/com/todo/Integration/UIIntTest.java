@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.awt.Frame;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import javax.swing.SwingUtilities;
 
@@ -27,17 +29,25 @@ public class UIIntTest {
     private TodoUI todoUI;
     private UserService userServiceMock;
     private TodoService todoServiceMock;
+    
 
     @BeforeEach
     void setUp() throws Exception {
         userServiceMock = mock(UserService.class);
-        todoServiceMock = mock(TodoService.class);
-        
+        todoServiceMock = mock(TodoService.class); 
         SwingUtilities.invokeAndWait(() -> {
             ui = new UI(userServiceMock, todoServiceMock);
             ui.setVisible(true);
         });
         UserService.clearUsers();
+    }
+    
+    @AfterEach
+    void tearDown() {
+        SwingUtilities.invokeLater(() -> {
+            if (ui != null) ui.dispose();
+            if (todoUI != null) todoUI.dispose();
+        });
     }
     
     @Test
@@ -199,12 +209,51 @@ public class UIIntTest {
 
         verify(userServiceMock, times(3)).login(anyString(), anyString());
     }
-
-    @AfterEach
-    void tearDown() {
-        SwingUtilities.invokeLater(() -> {
-            if (ui != null) ui.dispose();
-            if (todoUI != null) todoUI.dispose();
+    
+    @Test
+    @DisplayName("Test launchTodoUI with null user")
+    void testLaunchTodoUIWithNullUser() throws Exception {
+        Method launchTodoUIMethod = UI.class.getDeclaredMethod("launchTodoUI", User.class);
+        launchTodoUIMethod.setAccessible(true);
+        
+        Exception exception = assertThrows(InvocationTargetException.class, () -> {
+            launchTodoUIMethod.invoke(ui, (User) null);
         });
+        
+         Throwable cause = exception.getCause();
+        assertNotNull(cause);
+        assertTrue(cause instanceof IllegalArgumentException);
+        assertEquals("Cannot launch TodoUI: user is null.", cause.getMessage());
     }
+    
+    @Test
+    @DisplayName("Test validateInput with blank username")
+    void testValidateInputWithBlankUsername() throws Exception {
+        Method validateInputMethod = UI.class.getDeclaredMethod("validateInput", String.class, String.class);
+        validateInputMethod.setAccessible(true);
+        
+        boolean result = (boolean) validateInputMethod.invoke(ui, "   ", "password123");
+        assertFalse(result, "Should return false for blank username");
+    }
+    
+    @Test
+    @DisplayName("Test validateInput with blank password")
+    void testValidateInputWithBlankPassword() throws Exception {
+        Method validateInputMethod = UI.class.getDeclaredMethod("validateInput", String.class, String.class);
+        validateInputMethod.setAccessible(true);
+        
+        boolean result = (boolean) validateInputMethod.invoke(ui, "username", "   ");
+        assertFalse(result, "Should return false for blank password");
+    }
+    
+    @Test
+    @DisplayName("Test validateInput with both fields blank")
+    void testValidateInputWithBothFieldsBlank() throws Exception {
+        Method validateInputMethod = UI.class.getDeclaredMethod("validateInput", String.class, String.class);
+        validateInputMethod.setAccessible(true);
+        
+        boolean result = (boolean) validateInputMethod.invoke(ui, "   ", "   ");
+        assertFalse(result, "Should return false when both fields are blank");
+    }
+    
 }

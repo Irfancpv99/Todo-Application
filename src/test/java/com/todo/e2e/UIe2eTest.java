@@ -345,6 +345,30 @@ public class UIe2eTest {
         });
     }
     
+    @Test
+    @DisplayName("Test main method")
+    void testMainMethod() throws Exception {
+        Thread mainThread = new Thread(() -> {
+            UI.main(new String[]{});
+        });
+        
+        mainThread.start();
+        Thread.sleep(500);
+        
+        boolean uiWindowFound = false;
+        for (java.awt.Window window : java.awt.Window.getWindows()) {
+            if (window instanceof UI) {
+                uiWindowFound = true;
+                window.dispose(); // Clean up
+                break;
+            }
+        }
+        
+        assertTrue(uiWindowFound, "UI window should be created by main method");
+        
+        mainThread.interrupt();
+    }
+    
     private void cleanDatabase() {
         try (Connection conn = DatabaseConfig.getConnection()) {
             conn.createStatement().execute("DELETE FROM todos");
