@@ -13,65 +13,83 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 public class TodoService {
-	
-	
-	private int nextUserSpecificId = 1;
+    
+    private int nextUserSpecificId = 1;
 
-	public Todo createTodo(int userSpecificId, int userId, String title, String description, LocalDate dueDate, Priority priority, Tags tag) {
-		
-		if (title == null) {
-	        throw new IllegalArgumentException("Title cannot be null");
-	    }
-		
-		if (description == null) {
-	        throw new IllegalArgumentException("Description cannot be null");
-	    }
-		
-		if (dueDate == null) {
-	        throw new IllegalArgumentException("DueDate cannot be null");
-	    }
-		
-		if (tag == null) {
-	        throw new IllegalArgumentException("Tag cannot be null");
-	    }
-		if (priority == null) {
-	        throw new IllegalArgumentException("Priority cannot be null");
-	    }
-		
-		try (Connection conn = DatabaseConfig.getConnection()) {
-	        conn.setAutoCommit(false);
-	        try {
-	            try (PreparedStatement ps = conn.prepareStatement(
-	                "INSERT INTO todos (user_specific_id, user_id, title, description, due_date, priority, tag) " +
-	                "VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id")) {
-	                
-	                ps.setInt(1, userSpecificId);
-	                ps.setInt(2, userId);
-	                ps.setString(3, title);
-	                ps.setString(4, description);
-	                ps.setDate(5, Date.valueOf(dueDate));
-	                ps.setString(6, priority.toString());
-	                ps.setString(7, tag.toString());
-	                
-	                ResultSet rs = ps.executeQuery();
-	                rs.next();
-	                int generatedId = rs.getInt(1);
-	                
-	                conn.commit();
-	                Todo todo = new Todo(generatedId, userId, title, description, dueDate, priority, tag);
-	                todo.setUserSpecificId(userSpecificId);
-	                return todo;
-	            }
-	        } catch (SQLException e) {
-	            conn.rollback();
-	            throw e;
-	        } finally {
-	            conn.setAutoCommit(true);
-	        }
-	    } catch (SQLException e) {
-	        throw new RuntimeException("Database error: " + e.getMessage());
-	    }
-	}
+    public Todo createTodo(int userSpecificId, int userId, String title, String description, LocalDate dueDate, Priority priority, Tags tag) {
+        
+        if (title == null || title.trim().isEmpty()) {
+            throw new IllegalArgumentException("Title cannot be null or empty");
+        }
+        
+        if (description == null || description.trim().isEmpty()) {
+            throw new IllegalArgumentException("Description cannot be null or empty");
+        }
+        
+        if (dueDate == null) {
+            throw new IllegalArgumentException("DueDate cannot be null");
+        }
+        
+        if (tag == null) {
+            throw new IllegalArgumentException("Tag cannot be null");
+        }
+        if (priority == null) {
+            throw new IllegalArgumentException("Priority cannot be null");
+        }
+        
+        try (Connection conn = DatabaseConfig.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO todos (user_specific_id, user_id, title, description, due_date, priority, tag, completed, status) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")) {
+                
+                    if (userId <= 0 || !userExists(conn, userId)) {
+                        throw new SQLException("Invalid user ID: " + userId);
+                    }
+                    
+                    ps.setInt(1, userSpecificId);
+                    ps.setInt(2, userId);
+                    ps.setString(3, title);
+                    ps.setString(4, description);
+                    ps.setDate(5, Date.valueOf(dueDate));
+                    ps.setString(6, priority.toString());
+                    ps.setString(7, tag.toString());
+                    ps.setBoolean(8, false); 
+                    ps.setString(9, Status.PENDING.toString()); 
+                    
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.next()) {
+                        throw new SQLException("Failed to retrieve generated ID");
+                    }
+                    int generatedId = rs.getInt(1);
+                    
+                    conn.commit();
+                    Todo todo = new Todo(generatedId, userId, title, description, dueDate, priority, tag);
+                    todo.setUserSpecificId(userSpecificId);
+                    todo.setCompleted(false);
+                    todo.setStatus(Status.PENDING);
+                    return todo;
+                }
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean userExists(Connection conn, int userId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT 1 FROM users WHERE id = ?")) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
 
     public Todo getTodoById(int id) {
         try (Connection conn = DatabaseConfig.getConnection();
@@ -88,7 +106,7 @@ public class TodoService {
             return null;
             
         } catch (SQLException e) {
-            throw new RuntimeException("Database error: " + e.getMessage());
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
     }
 
@@ -96,6 +114,11 @@ public class TodoService {
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement ps = conn.prepareStatement(
                  "UPDATE todos SET user_id = ?, title = ?, description = ?, due_date = ?, priority = ?, tag = ?, completed = ?, status = ? WHERE id = ?")) {
+            
+            // Validate userId by checking if user exists
+            if (userId <= 0 || !userExists(conn, userId)) {
+                throw new SQLException("Invalid user ID: " + userId);
+            }
             
             ps.setInt(1, userId);
             ps.setString(2, title);
@@ -115,7 +138,7 @@ public class TodoService {
             return getTodoById(id);
             
         } catch (SQLException e) {
-            throw new RuntimeException("Database error: " + e.getMessage());
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
     }
 
@@ -128,7 +151,7 @@ public class TodoService {
             return ps.executeUpdate() > 0;
             
         } catch (SQLException e) {
-            throw new RuntimeException("Database error: " + e.getMessage());
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
     }
     
@@ -147,24 +170,85 @@ public class TodoService {
             }
             
         } catch (SQLException e) {
-            throw new RuntimeException("Database error: " + e.getMessage());
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
         
         return todos;
     }
 
     private Todo mapResultSetToTodo(ResultSet rs) throws SQLException {
-        Todo todo = new Todo(
-            rs.getInt("id"),
-            rs.getInt("user_id"),
-            rs.getString("title"),
-            rs.getString("description"),
-            rs.getDate("due_date").toLocalDate(),
-            Priority.valueOf(rs.getString("priority")),
-            Tags.valueOf(rs.getString("tag"))
-        );
-        todo.setCompleted(rs.getBoolean("completed"));
-        todo.setStatus(Status.valueOf(rs.getString("status")));
+       
+        int id = rs.getInt("id");
+        int userId = rs.getInt("user_id");
+        String title = rs.getString("title");
+        String description = rs.getString("description");
+        LocalDate dueDate = rs.getDate("due_date").toLocalDate();
+        
+       
+        String priorityStr = rs.getString("priority");
+        Priority priority = Priority.MEDIUM; // Default value
+        if (priorityStr != null) {
+            try {
+                priority = Priority.valueOf(priorityStr);
+            } catch (IllegalArgumentException e) {
+                System.err.println("Warning: Invalid priority value in database: " + priorityStr);
+            }
+        }
+        
+      
+        String tagStr = rs.getString("tag");
+        Tags tag = Tags.Work; 
+        if (tagStr != null) {
+            try {
+                tag = Tags.valueOf(tagStr);
+            } catch (IllegalArgumentException e) {
+                System.err.println("Warning: Invalid tag value in database: " + tagStr);
+            }
+        }
+        
+       
+        Todo todo = new Todo(id, userId, title, description, dueDate, priority, tag);
+        
+        
+        try {
+            int userSpecificId = rs.getInt("user_specific_id");
+            if (!rs.wasNull()) {
+                todo.setUserSpecificId(userSpecificId);
+            }
+        } catch (SQLException e) {
+            
+        }
+        
+        
+        boolean completed = false;
+        try {
+            completed = rs.getBoolean("completed");
+        } catch (SQLException e) {
+            
+        }
+        todo.setCompleted(completed);
+        
+       
+        try {
+            String statusStr = rs.getString("status");
+            if (statusStr != null) {
+                try {
+                    Status status = Status.valueOf(statusStr);
+                    todo.setStatus(status);
+                } catch (IllegalArgumentException e) {
+                    
+                    System.err.println("Warning: Invalid status value in database: " + statusStr);
+                    todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
+                }
+            } else {
+                
+                todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
+            }
+        } catch (SQLException e) {
+           
+            todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
+        }
+        
         return todo;
     }
     

@@ -9,6 +9,7 @@ import com.todo.service.UserService;
 import com.todo.config.DatabaseConfig;
 
 import org.junit.jupiter.api.*;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -17,6 +18,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TodoServiceIntTest {
     private TodoService todoService;
     private UserService userService;
-    private int userId;
+    private int userId = 1;
     private static final String TEST_USERNAME = "testuser";
     private static final String TEST_PASSWORD = "testpass";
 
@@ -58,7 +63,6 @@ class TodoServiceIntTest {
         try (Connection conn = DatabaseConfig.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute("DELETE FROM todos");
-            stmt.execute("DELETE FROM users CASCADE");
         } catch (Exception e) {
             fail("Database cleanup failed: " + e.getMessage());
         }
@@ -312,7 +316,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Test Transaction Isolation in Concurrent Updates")
     void testTransactionIsolation() throws InterruptedException {
-        // Create initial todo
+
         Todo todo = todoService.createTodo(
             1,
             userId,
@@ -326,7 +330,6 @@ class TodoServiceIntTest {
         CountDownLatch latch = new CountDownLatch(2);
         AtomicInteger successCount = new AtomicInteger(0);
         
-        // Thread 1: Update title
         new Thread(() -> {
             try {
                 todoService.updateTodo(
@@ -346,8 +349,7 @@ class TodoServiceIntTest {
                 latch.countDown();
             }
         }).start();
-        
-        // Thread 2: Update description
+
         new Thread(() -> {
             try {
                 todoService.updateTodo(
@@ -369,8 +371,7 @@ class TodoServiceIntTest {
         }).start();
         
         latch.await(5, TimeUnit.SECONDS);
-        
-        // Verify final state
+   
         Todo finalTodo = todoService.getTodoById(todo.getId());
         assertNotNull(finalTodo);
         assertTrue(
@@ -537,7 +538,7 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Test Complex Transaction Scenarios")
     void testComplexTransactionScenarios() {
-        // First create a successful todo
+
         Todo todo = todoService.createTodo(
             1,
             userId,
@@ -569,13 +570,31 @@ class TodoServiceIntTest {
     void testUpdateNonExistentTodo() {
         assertThrows(NoSuchElementException.class, () -> {
             todoService.updateTodo(
-                99999, // Non-existent ID
+                99999, 
                 userId,
                 "Updated Title",
                 "Updated Description",
                 LocalDate.now(),
                 Priority.HIGH,
                 Tags.Urgent,
+                true
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Test updateTodo throws exception on invalid user ID")
+    void testUpdateTodoWithInvalidUserId() {
+        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);
+        assertThrows(RuntimeException.class, () -> {
+            todoService.updateTodo(
+                todo.getId(),
+                99999, // Invalid user ID
+                "New Title",
+                "New Desc",
+                LocalDate.now(),
+                Priority.HIGH,
+                Tags.Home,
                 true
             );
         });
@@ -786,4 +805,96 @@ class TodoServiceIntTest {
         assertEquals(2, todoService.getNextUserSpecificId());
         assertEquals(3, todoService.getNextUserSpecificId());
     }
+    
+    @Test
+    @DisplayName("Test getTodoById throws exception on database error")
+    void testGetTodoByIdDatabaseError() {
+
+        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE todos");
+        } catch (SQLException e) {
+            fail("Failed to drop table: " + e.getMessage());
+        }
+        assertThrows(RuntimeException.class, () -> todoService.getTodoById(todo.getId()));
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, user_id INT, title VARCHAR(255), description TEXT, due_date DATE, priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
+        } catch (SQLException e) {
+            fail("Failed to recreate table: " + e.getMessage());
+        }
+    }
+    
+    @Test
+    @DisplayName("Get Non-Existent Todo By ID")
+    void testGetNonExistentTodo() {
+        Todo result = todoService.getTodoById(9999);
+        assertNull(result);
+    }
+    
+    @Test
+    @DisplayName("Create Todo Fails to Retrieve Generated ID")
+    void testCreateTodoFailsToRetrieveId() throws SQLException {
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO todos (user_id, title, description, due_date, priority, tag, completed, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, userId);
+            ps.setString(2, "Task");
+            ps.setString(3, "Desc");
+            ps.setDate(4, Date.valueOf(LocalDate.now()));
+            ps.setString(5, "LOW");
+            ps.setString(6, "Work");
+            ps.setBoolean(7, false);
+            ps.setString(8, "PENDING");
+            ps.executeUpdate();
+
+            ResultSet rs = ps.getGeneratedKeys();
+            assertTrue(rs.next(), "Expected generated keys, but none were found");
+        }
+    }
+
+    @Test
+    @DisplayName("Handle Invalid Priority and Tag in Database")
+    void testInvalidPriorityAndTagInDatabase() throws SQLException {
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) VALUES (999, " + userId + ", 'Invalid', 'Desc', CURRENT_DATE, 'INVALID_PRIORITY', 'INVALID_TAG', false, 'INVALID_STATUS')");
+        }
+        Todo todo = todoService.getTodoById(999);
+        assertNotNull(todo);
+        assertEquals(Priority.MEDIUM, todo.getPriority());
+        assertEquals(Tags.Work, todo.getTags());
+    }
+
+    @Test
+    @DisplayName("Handle Null Priority and Tag in Database")
+    void testNullPriorityAndTagInDatabase() throws SQLException {
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");) {
+            ps.setInt(1, 999);
+            ps.setInt(2, userId);
+            ps.setString(3, "Null Fields");
+            ps.setString(4, "Desc");
+            ps.setDate(5, Date.valueOf(LocalDate.now()));
+            ps.setNull(6, java.sql.Types.VARCHAR);
+            ps.setNull(7, java.sql.Types.VARCHAR);
+            ps.setBoolean(8, false);
+            ps.executeUpdate();
+        }
+        Todo todo = todoService.getTodoById(999);
+        assertNotNull(todo);
+        assertEquals(Priority.MEDIUM, todo.getPriority());
+        assertEquals(Tags.Work, todo.getTags());
+    }
+
+    @Test
+    @DisplayName("Handle Invalid and Null Status in Database")
+    void testInvalidStatusInDatabase() throws SQLException {
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) VALUES (999, " + userId + ", 'Invalid Status', 'Desc', CURRENT_DATE, 'LOW', 'Work', false, 'INVALID_STATUS')");
+        }
+        Todo todo = todoService.getTodoById(999);
+        assertEquals(Status.PENDING, todo.getStatus());
+    }
+    
 }

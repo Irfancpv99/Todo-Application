@@ -535,7 +535,7 @@ class DatabaseConfigTest {
         }
     }
     
-    // Test the private constructor for coverage
+ 
     @Test
     @DisplayName("Test private constructor for coverage")
     void testPrivateConstructor() throws Exception {

@@ -1,5 +1,6 @@
 package com.todo.config;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
@@ -7,28 +8,29 @@ public class PropertiesLoader {
     private static Properties properties = new Properties();
     
     static {
-        String propertiesFile = isTestEnvironment() ? 
-            "application-test.properties" : "application.properties";
-        
-        try (InputStream input = PropertiesLoader.class.getClassLoader()
-                .getResourceAsStream(propertiesFile)) {
-            if (input == null) {
-                throw new RuntimeException(propertiesFile + " not found in classpath");
-            }
+        loadProperties("application.properties");
+    }
+    
+    public static void loadProperties(String filename) {
+        try (InputStream input = getResourceAsStream(filename)) {
+            loadProperties(input, filename);
+        } catch (Exception e) {
+            throw new RuntimeException("Could not load " + filename, e);
+        }
+    }
+
+    public static void loadProperties(InputStream input, String filename) {
+        if (input == null) {
+            throw new RuntimeException(filename + " not found");
+        }
+        try {
             properties.load(input);
             resolveEnvironmentVariables();
-        } catch (Exception e) {
-            throw new RuntimeException("Could not load " + propertiesFile, e);
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading " + filename, e);
         }
     }
     
-    private static boolean isTestEnvironment() {
-        return "test".equals(System.getProperty("spring.profiles.active")) ||
-               Boolean.parseBoolean(System.getProperty("test", "false"));
-    }
-    
-    
-
     private static void resolveEnvironmentVariables() {
         Properties resolvedProps = new Properties();
         properties.forEach((key, value) -> {
@@ -89,10 +91,7 @@ public class PropertiesLoader {
         String value = properties.getProperty(key);
         return value != null ? Integer.parseInt(value) : defaultValue;
     }
-
-    public static void printProperties() {
-        System.out.println("Loaded Properties:");
-        properties.forEach((key, value) -> 
-            System.out.println(key + " = " + value));
+    private static InputStream getResourceAsStream(String filename) {
+        return PropertiesLoader.class.getClassLoader().getResourceAsStream(filename);
     }
 }

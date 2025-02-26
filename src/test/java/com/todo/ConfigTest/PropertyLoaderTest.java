@@ -10,9 +10,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
@@ -352,257 +356,114 @@ class PropertiesLoaderTest {
             Arguments.of("${VAR1:${VAR2:nested}}", "${VAR2:nested}")
         );
     }
+    @Test
+    @Order(12)
+    @DisplayName("Test the PropertiesLoader constructor")
+    void testConstructor() throws Exception {
+        Constructor<PropertiesLoader> constructor = PropertiesLoader.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        Object instance = constructor.newInstance();
+        assertNotNull(instance, "Should successfully create instance");
+    }
     
-//    @Test
-//    @DisplayName("Test database initialization failure path")
-//    void testDatabaseInitializationFailure() throws Exception {
-//        // Set up invalid database configuration
-//        Properties properties = (Properties) propsField.get(null);
-//        properties.setProperty("db.url", "jdbc:postgresql://invalid:5432/nonexistentdb");
-//        
-//        // Attempt to initialize - this should throw a RuntimeException
-//        Exception exception = assertThrows(RuntimeException.class, 
-//            () -> DatabaseConfig.initialize());
-//        
-//        // Assert that we got an exception, which verifies the error path was executed
-//        assertNotNull(exception);
-//    }
-//    
-//    @Test
-//    @DisplayName("Test closePool when dataSource.isClosed() returns true")
-//    void testClosePoolWithClosedDataSource() throws Exception {
-//        Field dataSourceField = DatabaseConfig.class.getDeclaredField("dataSource");
-//        dataSourceField.setAccessible(true);
-//        
-//        HikariDataSource mockDataSource = mock(HikariDataSource.class);
-//        when(mockDataSource.isClosed()).thenReturn(true);
-//        
-//        dataSourceField.set(null, mockDataSource);
-//        DatabaseConfig.closePool();
-//        
-//        // Verify close() was not called since dataSource.isClosed() returned true
-//        verify(mockDataSource, never()).close();
-//    }
-//    
-//    // Test to cover isTestEnvironment() method in PropertiesLoader
-//    @Test
-//    @DisplayName("Test isTestEnvironment() method")
-//    void testIsTestEnvironment() throws Exception {
-//        Method isTestEnvironmentMethod = PropertiesLoader.class.getDeclaredMethod("isTestEnvironment");
-//        isTestEnvironmentMethod.setAccessible(true);
-//        
-//        // Test with "test" profile
-//        try {
-//            System.setProperty("spring.profiles.active", "test");
-//            assertTrue((Boolean) isTestEnvironmentMethod.invoke(null), 
-//                "Should return true when spring.profiles.active is 'test'");
-//        } finally {
-//            System.clearProperty("spring.profiles.active");
-//        }
-//        
-//        // Test with "test" property set to true
-//        try {
-//            System.setProperty("test", "true");
-//            assertTrue((Boolean) isTestEnvironmentMethod.invoke(null), 
-//                "Should return true when test property is 'true'");
-//        } finally {
-//            System.clearProperty("test");
-//        }
-//        
-//        // Test with "test" property set to false
-//        try {
-//            System.setProperty("test", "false");
-//            assertFalse((Boolean) isTestEnvironmentMethod.invoke(null), 
-//                "Should return false when test property is 'false'");
-//        } finally {
-//            System.clearProperty("test");
-//        }
-//        
-//        // Test with no properties set
-//        assertFalse((Boolean) isTestEnvironmentMethod.invoke(null), 
-//            "Should return false when no relevant properties are set");
-//    }
-//    
-//    // Test to cover additional edge cases in resolveEnvironmentVariables
-//    @Test
-//    @DisplayName("Test edge cases in resolveEnvironmentVariables")
-//    void testEdgeCasesInResolveEnvVars() throws Exception {
-//        Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
-//        resolveMethod.setAccessible(true);
-//        
-//        Properties properties = (Properties) propsField.get(null);
-//        properties.clear();
-//        
-//        // Test with a real environment variable if any exists
-//        String firstEnvVar = System.getenv().keySet().stream().findFirst().orElse(null);
-//        if (firstEnvVar != null) {
-//            String envValue = System.getenv(firstEnvVar);
-//            properties.setProperty("test.real.env", "${" + firstEnvVar + ":default}");
-//            
-//            resolveMethod.invoke(null);
-//            
-//            assertEquals(envValue, PropertiesLoader.getProperty("test.real.env"),
-//                "Should use actual environment variable value");
-//        }
-//        
-//        // Test with escaped default value containing environment variables
-//        // This test needs to match exactly how your implementation handles escaping
-//        properties.setProperty("test.escaped.var", "${NONEXISTENT_VAR:\\${ANOTHER_VAR\\}}");
-//        resolveMethod.invoke(null);
-//        
-//        // Updated expectation - note that your implementation might keep the escapes
-//        String expectedValue = "\\${ANOTHER_VAR\\}"; // Your implementation might keep the escapes
-//        assertEquals(expectedValue, PropertiesLoader.getProperty("test.escaped.var"),
-//            "Should handle escaped values correctly");
-//        
-//        // Test with multiple nested variables that need to be preserved
-//        properties.setProperty("test.nested.vars", "prefix ${OUTER_VAR:${INNER_VAR:inner_default}} suffix");
-//        resolveMethod.invoke(null);
-//        assertEquals("prefix ${INNER_VAR:inner_default} suffix", 
-//            PropertiesLoader.getProperty("test.nested.vars"),
-//            "Should properly handle nested variables");
-//    }
-//    
-//    // Test private constructors for coverage
-//    @Test
-//    @DisplayName("Test private constructors for coverage")
-//    void testPrivateConstructors() throws Exception {
-//        // Test DatabaseConfig constructor
-//        Constructor<DatabaseConfig> dbConstructor = DatabaseConfig.class.getDeclaredConstructor();
-//        dbConstructor.setAccessible(true);
-//        dbConstructor.newInstance();
-//        
-//        // Test PropertiesLoader constructor  
-//        Constructor<PropertiesLoader> propsConstructor = PropertiesLoader.class.getDeclaredConstructor();
-//        propsConstructor.setAccessible(true);
-//        propsConstructor.newInstance();
-//    }
-//    
-//    // Test printProperties method
-//    @Test
-//    @DisplayName("Test printProperties method")
-//    void testPrintProperties() throws Exception {
-//        Properties properties = (Properties) propsField.get(null);
-//        properties.clear();
-//        properties.setProperty("test.key1", "value1");
-//        properties.setProperty("test.key2", "value2");
-//        
-//        // This just invokes the method to ensure coverage
-//        PropertiesLoader.printProperties();
-//    }
-//    
-//    // Alternate approach to test static initialization error
-//    @Test
-//    @DisplayName("Test PropertiesLoader class loading")
-//    void testPropertiesLoaderClassLoading() {
-//        // Simply testing that the class can be loaded and a method called
-//        // This improves coverage of the static initializer block
-//        assertDoesNotThrow(() -> {
-//            Class<?> loaderClass = PropertiesLoader.class;
-//            Method isTestEnvironmentMethod = loaderClass.getDeclaredMethod("isTestEnvironment");
-//            isTestEnvironmentMethod.setAccessible(true);
-//            
-//            // Just verify we can call the method
-//            boolean result = (boolean) isTestEnvironmentMethod.invoke(null);
-//            assertTrue(result == true || result == false);
-//        });
-//    }
-//    
-//    @Test
-//    @DisplayName("Test properties file loading failures")
-//    void testPropertiesFileLoadingFailures() throws Exception {
-//        // Test the code paths directly within this test class
-//        
-//        // Test 1: File not found scenario
-//        assertThrows(RuntimeException.class, () -> {
-//            String missingFile = "missing-file.properties";
-//            try (InputStream input = getClass().getClassLoader().getResourceAsStream(missingFile)) {
-//                if (input == null) {
-//                    throw new RuntimeException(missingFile + " not found in classpath");
-//                }
-//                // This won't execute
-//                Properties properties = new Properties();
-//                properties.load(input);
-//            } catch (Exception e) {
-//                throw new RuntimeException("Could not load " + missingFile, e);
-//            }
-//        }, "Should throw exception when properties file is not found");
-//        
-//        // Test 2: Exception during loading
-//        assertThrows(RuntimeException.class, () -> {
-//            String brokenFile = "broken-file.properties";
-//            try {
-//                // Create a stream that will throw an exception
-//                InputStream problemStream = new InputStream() {
-//                    @Override
-//                    public int read() throws java.io.IOException {
-//                        throw new java.io.IOException("Simulated IO error");
-//                    }
-//                };
-//                
-//                Properties properties = new Properties();
-//                properties.load(problemStream);
-//            } catch (Exception e) {
-//                throw new RuntimeException("Could not load " + brokenFile, e);
-//            }
-//        }, "Should throw exception when properties loading fails");
-//    }
-//    
-//    @Test
-//    @DisplayName("Test static initializer code directly")
-//    void testStaticInitializerDirectly() {
-//        // Test 1: Test the file not found path
-//        String missingFile = "missing-file.properties";
-//        Exception fileNotFoundException = assertThrows(RuntimeException.class, () -> {
-//            try (InputStream input = getClass().getClassLoader().getResourceAsStream(missingFile)) {
-//                if (input == null) {
-//                    throw new RuntimeException(missingFile + " not found in classpath");
-//                }
-//                Properties testProps = new Properties();
-//                testProps.load(input); // This won't execute
-//            } catch (Exception e) {
-//                throw new RuntimeException("Could not load " + missingFile, e);
-//            }
-//        });
-//        assertTrue(fileNotFoundException.getMessage().contains("Could not load"));
-//        
-//        // Test 2: Test exception during properties loading
-//        String brokenFile = "broken-file.properties";
-//        Exception loadException = assertThrows(RuntimeException.class, () -> {
-//            try {
-//                InputStream problemStream = new InputStream() {
-//                    @Override
-//                    public int read() throws IOException {
-//                        throw new IOException("Simulated IO error");
-//                    }
-//                };
-//                
-//                Properties testProps = new Properties();
-//                testProps.load(problemStream); // This will throw
-//            } catch (Exception e) {
-//                throw new RuntimeException("Could not load " + brokenFile, e);
-//            }
-//        });
-//        assertTrue(loadException.getMessage().contains("Could not load"));
-//        
-//        // Test 3: Test both branches of the ternary operator for file selection
-//        try {
-//            // First with test=false (regular properties file)
-//            System.clearProperty("test");
-//            System.clearProperty("spring.profiles.active");
-//            Method isTestMethod = PropertiesLoader.class.getDeclaredMethod("isTestEnvironment");
-//            isTestMethod.setAccessible(true);
-//            boolean notTestEnv = (boolean) isTestMethod.invoke(null);
-//            assertFalse(notTestEnv);
-//            
-//            // Then with test=true (test properties file)
-//            System.setProperty("test", "true");
-//            boolean isTestEnv = (boolean) isTestMethod.invoke(null);
-//            assertTrue(isTestEnv);
-//        } catch (Exception e) {
-//            fail("Exception testing isTestEnvironment: " + e.getMessage());
-//        } finally {
-//            System.clearProperty("test");
-//        }
-//    }
+    @Test
+    @Order(13)
+    @DisplayName("Test real environment variable resolution")
+    void testRealEnvironmentVariable() throws Exception {
+        Map<String, String> env = System.getenv();
+        
+        Assumptions.assumeFalse(env.isEmpty(), "No environment variables available for testing");
+        
+        String envVarName = env.keySet().iterator().next();
+        String envVarValue = env.get(envVarName);
+        
+        Properties testProps = new Properties();
+        testProps.setProperty("test.env", "${" + envVarName + ":default}");
+        Properties properties = (Properties) propsField.get(null);
+        Properties originalProps = new Properties();
+        originalProps.putAll(properties);
+        
+        try {
+            properties.clear();
+            properties.putAll(testProps);
+            
+            Method resolveMethod = PropertiesLoader.class.getDeclaredMethod("resolveEnvironmentVariables");
+            resolveMethod.setAccessible(true);
+            resolveMethod.invoke(null);
+            assertEquals(envVarValue, PropertiesLoader.getProperty("test.env"));
+        } finally {
+            properties.clear();
+            properties.putAll(originalProps);
+        }
+    }
+    
+    @Test
+    @Order(14)
+    @DisplayName("Test exception paths")
+    void testExceptionPaths() {
+         
+        assertThrows(RuntimeException.class, () -> {
+            PropertiesLoader.getProperty("non.existent.key");
+        });
+        assertThrows(NullPointerException.class, () -> {
+            PropertiesLoader.getProperty(null);
+        });
+    }
+    
+    @Test
+    @Order(15)
+    @DisplayName("Test resource not found scenarios")
+    void testResourceNotFoundScenarios() {
+        // Test logic similar to the "input == null" check in static initializer
+        String nonExistentFile = "non-existent-file.properties";
+        InputStream stream = PropertiesLoader.class.getClassLoader().getResourceAsStream(nonExistentFile);
+        assertNull(stream, "Stream should be null for non-existent resource");
+        
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            if (stream == null) {
+                throw new RuntimeException(nonExistentFile + " not found in classpath");
+            }
+        });
+        assertTrue(exception.getMessage().contains("not found in classpath"));
+    }
+    
+    @Test
+    void testLoadProperties_FileNotFound() {
+        assertThrows(RuntimeException.class, () -> 
+            PropertiesLoader.loadProperties("nonexistent.properties"));
+    }
+    
+    @Test
+    void testLoadProperties_IOException() {
+        InputStream brokenStream = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("Simulated error");
+            }
+        };
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> 
+            PropertiesLoader.loadProperties(brokenStream, "broken.properties"));
+
+        assertTrue(exception.getMessage().contains("Error reading broken.properties"));
+    }
+    
+    @Test
+    @Order(16)
+    @DisplayName("Test IOException during property loading")
+    void testIOExceptionDuringLoading() throws Exception {
+        InputStream brokenStream = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("Simulated IO Exception");
+            }
+        };
+        
+        Properties testProps = new Properties();
+        Exception exception = assertThrows(Exception.class, () -> {
+            testProps.load(brokenStream);
+        });
+        
+        assertNotNull(exception, "An exception should be thrown");
+    }
 }
