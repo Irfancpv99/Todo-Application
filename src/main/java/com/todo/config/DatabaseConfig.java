@@ -9,7 +9,10 @@ import javax.swing.JOptionPane;
 
 public class DatabaseConfig {
     private static HikariDataSource dataSource;
-
+    private static Connection testConnection = null;
+    
+    
+    
     private static String getDbUrl() {
         return PropertiesLoader.getProperty("db.url");
     }
@@ -26,7 +29,7 @@ public class DatabaseConfig {
         try {
             HikariConfig config = new HikariConfig();
             
-            // Use the new methods to get connection details
+            
             config.setJdbcUrl(getDbUrl());
             config.setUsername(getDbUsername());
             config.setPassword(getDbPassword());
@@ -58,6 +61,11 @@ public class DatabaseConfig {
     }
 
     public static Connection getConnection() throws SQLException {
+    	if (testConnection != null) {
+            return testConnection;
+        }
+        
+        // Normal operation
         if (dataSource == null || dataSource.isClosed()) {
             initialize();
         }
@@ -68,5 +76,14 @@ public class DatabaseConfig {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
         }
+    }
+    
+    public static void setTestConnection(Connection connection) {
+        testConnection = connection;
+    }
+    
+    // For test use only - reset test connection
+    public static void resetTestConnection() {
+        testConnection = null;
     }
 }

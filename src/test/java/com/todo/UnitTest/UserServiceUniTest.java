@@ -1,21 +1,45 @@
 package com.todo.UnitTest;
 
+import com.todo.config.DatabaseConfig;
 import com.todo.model.User;
 import com.todo.service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.sql.Statement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+
+@ExtendWith(MockitoExtension.class)
 class UserServiceUniTest {
 
     private UserService userService;
-
+    private Connection mockConnection;
+    
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         UserService.clearUsers();
         userService = new UserService();
+        mockConnection = null;
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Clean up any mock connection that might have been set
+        if (mockConnection != null) {
+            DatabaseConfig.resetTestConnection();
+            mockConnection = null;
+        }
     }
 
     @Test
@@ -175,6 +199,94 @@ class UserServiceUniTest {
         
         userService.registerUser("user2", "password");
         assertTrue(userService.isUsernameTaken("user2"));
+    }
+    
+    @Test
+    @DisplayName("Register User Fails to Get Generated ID")
+    void testRegisterUserFailsToGetId() throws SQLException {
+        mockConnection = mock(Connection.class);
+        PreparedStatement mockPs = mock(PreparedStatement.class);
+        ResultSet mockRs = mock(ResultSet.class);
+        
+        DatabaseConfig.setTestConnection(mockConnection);
+        when(mockConnection.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS)))
+            .thenReturn(mockPs);
+        when(mockPs.executeUpdate()).thenReturn(1); // Simulate successful update
+        when(mockPs.getGeneratedKeys()).thenReturn(mockRs);
+        when(mockRs.next()).thenReturn(false); // No generated ID
+
+        assertThrows(RuntimeException.class, () ->
+            userService.registerUser("testuser", "testpass")
+        );
+    }
+    
+    @Test
+    @DisplayName("Login Throws Database Error")
+    void testLoginDatabaseError() throws SQLException {
+        
+    	mockConnection = mock(Connection.class);
+        DatabaseConfig.setTestConnection(mockConnection);
+        when(mockConnection.prepareStatement(anyString())).thenThrow(new SQLException("DB failure"));
+
+        assertThrows(RuntimeException.class, () ->
+            userService.login("user", "pass")
+        );
+    }
+  
+    @Test
+    @DisplayName("isUsernameTaken Returns False When No Rows")
+    void testIsUsernameTakenNoRows() throws SQLException {
+        mockConnection = mock(Connection.class);
+        PreparedStatement mockPs = mock(PreparedStatement.class);
+        ResultSet mockRs = mock(ResultSet.class);
+        
+        DatabaseConfig.setTestConnection(mockConnection);
+        
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+        when(mockPs.executeQuery()).thenReturn(mockRs);
+        when(mockRs.next()).thenReturn(false);
+
+        assertFalse(userService.isUsernameTaken("nonexistent"));
+    }
+    @Test
+    @DisplayName("isUsernameTaken Throws on SQLException")
+    void testIsUsernameTakenSQLException() throws SQLException {
+        mockConnection = mock(Connection.class);
+        
+        DatabaseConfig.setTestConnection(mockConnection);
+        
+        when(mockConnection.prepareStatement(anyString())).thenThrow(new SQLException("DB error"));
+
+        assertThrows(RuntimeException.class, () ->
+            userService.isUsernameTaken("testuser")
+        );
+    }
+
+    @Test
+    @DisplayName("clearUsers Handles Test Exception")
+    void testClearUsersTestException() throws SQLException {
+        
+    	mockConnection = mock(Connection.class);
+        PreparedStatement mockPs = mock(PreparedStatement.class);
+        
+        DatabaseConfig.setTestConnection(mockConnection);
+        
+        when(mockConnection.prepareStatement(anyString())).thenReturn(mockPs);
+        doThrow(new SQLException("Test exception")).when(mockPs).executeUpdate();
+        assertDoesNotThrow(() -> UserService.clearUsers());
+    }
+
+    @Test
+    @DisplayName("clearUsers Throws Other SQLExceptions")
+    void testClearUsersOtherExceptions() throws SQLException {
+        mockConnection = mock(Connection.class);
+        
+        DatabaseConfig.setTestConnection(mockConnection);
+        
+        when(mockConnection.prepareStatement(anyString())).thenThrow(new SQLException("Other error"));
+        assertThrows(RuntimeException.class, () -> 
+            UserService.clearUsers()
+        );
     }
 }
 
