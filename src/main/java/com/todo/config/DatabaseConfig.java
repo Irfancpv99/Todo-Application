@@ -43,6 +43,7 @@ public class DatabaseConfig {
             dataSource = new HikariDataSource(config);
             
             // Test connection
+            
             try (Connection conn = dataSource.getConnection()) {
                 System.out.println("Database connection successful");
                 
@@ -65,7 +66,6 @@ public class DatabaseConfig {
             return testConnection;
         }
         
-        // Normal operation
         if (dataSource == null || dataSource.isClosed()) {
             initialize();
         }
@@ -82,7 +82,6 @@ public class DatabaseConfig {
         testConnection = connection;
     }
     
-    // For test use only - reset test connection
     public static void resetTestConnection() {
         testConnection = null;
     }
