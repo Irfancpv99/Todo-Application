@@ -897,4 +897,36 @@ class TodoServiceIntTest {
         assertEquals(Status.PENDING, todo.getStatus());
     }
     
+    @Test
+    @DisplayName("Test deleteTodoById throws exception on database error")
+    void testDeleteTodoDatabaseError() {
+        var todo = todoService.createTodo(
+                1,
+                userId,  
+                "Task Error",
+                "Error Desc",
+                LocalDate.now().plusDays(1),
+                Priority.LOW,
+                Tags.Work
+        );
+        
+       
+        try (var conn = DatabaseConfig.getConnection();
+             var stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE todos");
+        } catch (SQLException e) {
+            fail("Failed to drop table: " + e.getMessage());
+        }
+        
+        assertThrows(RuntimeException.class, () -> todoService.deleteTodoById(todo.getId()));
+        
+        try (var conn = DatabaseConfig.getConnection();
+             var stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, user_id INT, title VARCHAR(255), description TEXT, due_date DATE, priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
+        } catch (SQLException e) {
+            fail("Failed to recreate table: " + e.getMessage());
+        }
+    }
+
+    
 }
