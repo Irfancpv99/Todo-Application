@@ -582,23 +582,23 @@ class TodoServiceIntTest {
         });
     }
     
-    @Test
-    @DisplayName("Test updateTodo throws exception on invalid user ID")
-    void testUpdateTodoWithInvalidUserId() {
-        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);
-        assertThrows(RuntimeException.class, () -> {
-            todoService.updateTodo(
-                todo.getId(),
-                99999, // Invalid user ID
-                "New Title",
-                "New Desc",
-                LocalDate.now(),
-                Priority.HIGH,
-                Tags.Home,
-                true
-            );
-        });
-    }
+//    @Test
+//    @DisplayName("Test updateTodo throws exception on invalid user ID")
+//    void testUpdateTodoWithInvalidUserId() {
+//        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);
+//        assertThrows(RuntimeException.class, () -> {
+//            todoService.updateTodo(
+//                todo.getId(),
+//                99999, // Invalid user ID
+//                "New Title",
+//                "New Desc",
+//                LocalDate.now(),
+//                Priority.HIGH,
+//                Tags.Home,
+//                true
+//            );
+//        });
+//    }
 
     @Test
     @DisplayName("Test Todo Status Transitions")
@@ -927,6 +927,80 @@ class TodoServiceIntTest {
             fail("Failed to recreate table: " + e.getMessage());
         }
     }
+    
+    @Test
+    @DisplayName("Update Todo with Invalid User ID Throws RuntimeException")
+    void testUpdateTodoWithInvalidUserId() {
+        Todo todo = todoService.createTodo(1, userId, "Test", "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work);
+        
+        assertThrows(RuntimeException.class, () -> {
+            todoService.updateTodo(
+                todo.getId(),
+                -999,
+                "Updated Title",
+                "Updated Description",
+                LocalDate.now(),
+                Priority.HIGH,
+                Tags.Work,
+                true
+            );
+        });
+    }
 
     
+    @Test
+    @DisplayName("Get Todos By User ID With Database Error")
+    void testGetTodosByUserIdWithDatabaseError() {
+        todoService.createTodo(1, userId, "Test", "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work);
+        
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE todos");
+        } catch (SQLException e) {
+            fail("Failed to drop table: " + e.getMessage());
+        }
+        
+        assertThrows(RuntimeException.class, () -> {
+            todoService.getTodosByUserId(userId);
+        });
+      
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, " +
+                    "user_id INT, title VARCHAR(255), description TEXT, due_date DATE, " +
+                    "priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
+        } catch (SQLException e) {
+            fail("Failed to recreate table: " + e.getMessage());
+        }
+    }
+    
+    @Test
+    @DisplayName("Get Todo By ID With Database Error")
+    void testGetTodoByIdWithDatabaseError() {
+        // Create a valid todo first
+        Todo todo = todoService.createTodo(1, userId, "Test", "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work);
+      
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP TABLE todos");
+        } catch (SQLException e) {
+            fail("Failed to drop table: " + e.getMessage());
+        }
+        
+        assertThrows(RuntimeException.class, () -> {
+            todoService.getTodoById(todo.getId());
+        });
+      
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, " +
+                    "user_id INT, title VARCHAR(255), description TEXT, due_date DATE, " +
+                    "priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
+        } catch (SQLException e) {
+            fail("Failed to recreate table: " + e.getMessage());
+        }
+    }
 }

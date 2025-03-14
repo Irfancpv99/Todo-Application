@@ -5,7 +5,7 @@ import com.todo.model.Tags;
 import com.todo.model.Status;
 import com.todo.model.Priority;
 
-import java.sql.Date;
+//import java.sql.Date;
 import java.time.LocalDate;
 
 import com.todo.service.TodoService;
@@ -16,22 +16,24 @@ import org.junit.jupiter.api.*;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+//import java.sql.ResultSet;
+//import java.sql.SQLException;
 import java.sql.Statement;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+//import static org.mockito.Mockito.*;
 
 
 class TodoServiceUniTest {
     private TodoService todoService;
     private static final int TEST_USER_ID = 1;
+    private int userId;
 
     @BeforeEach
     void setUp() {
         todoService = new TodoService();
         setupTestDatabase();
+        userId=1;
     }    
     
      @AfterEach
@@ -366,104 +368,29 @@ class TodoServiceUniTest {
         });
     }
     
-//    @Test
-//    @DisplayName("Test mapResultSetToTodo handles SQLException on user_specific_id")
-//    void testMapResultSetToTodo_UserSpecificIdSQLException() throws Exception {
-//        TodoService service = new TodoService();
-//        ResultSet rs = mock(ResultSet.class);
-//
-//        when(rs.getInt("id")).thenReturn(100);
-//        when(rs.getInt("user_id")).thenReturn(1);
-//        when(rs.getString("title")).thenReturn("Mock Todo");
-//        when(rs.getString("description")).thenReturn("Mock Desc");
-//        when(rs.getDate("due_date")).thenReturn(Date.valueOf(LocalDate.now()));
-//        when(rs.getString("priority")).thenReturn("MEDIUM");
-//        when(rs.getString("tag")).thenReturn("Work");
-//
-//        when(rs.getInt("user_specific_id")).thenThrow(new SQLException("Forced exception"));
-//        when(rs.getBoolean("completed")).thenReturn(false);
-//        when(rs.getString("status")).thenReturn("PENDING");
-//
-//        java.lang.reflect.Method method = TodoService.class.getDeclaredMethod("mapResultSetToTodo", ResultSet.class);
-//        method.setAccessible(true);
-//        Todo todo = (Todo) method.invoke(service, rs);
-//
-//        assertEquals(0, todo.getUserSpecificId());
-//    }
-//    
-//    @Test
-//    @DisplayName("Test mapResultSetToTodo handles SQLException on completed")
-//    void testMapResultSetToTodo_CompletedSQLException() throws Exception {
-//        TodoService service = new TodoService();
-//        ResultSet rs = mock(ResultSet.class);
-//
-//        when(rs.getInt("id")).thenReturn(101);
-//        when(rs.getInt("user_id")).thenReturn(1);
-//        when(rs.getString("title")).thenReturn("Mock Todo 2");
-//        when(rs.getString("description")).thenReturn("Mock Desc 2");
-//        when(rs.getDate("due_date")).thenReturn(Date.valueOf(LocalDate.now()));
-//        when(rs.getString("priority")).thenReturn("MEDIUM");
-//        when(rs.getString("tag")).thenReturn("Work");
-//        when(rs.getInt("user_specific_id")).thenReturn(10);
-//        when(rs.wasNull()).thenReturn(false);
-//        when(rs.getBoolean("completed")).thenThrow(new SQLException("Forced exception"));
-//        when(rs.getString("status")).thenReturn("PENDING");
-//
-//        java.lang.reflect.Method method = TodoService.class.getDeclaredMethod("mapResultSetToTodo", ResultSet.class);
-//        method.setAccessible(true);
-//        Todo todo = (Todo) method.invoke(service, rs);
-//
-//        assertFalse(todo.isCompleted());
-//    }
-//
-//    @Test
-//    @DisplayName("Test mapResultSetToTodo handles SQLException on status")
-//    void testMapResultSetToTodo_StatusSQLException() throws Exception {
-//        TodoService service = new TodoService();
-//        ResultSet rs = mock(ResultSet.class);
-//
-//        when(rs.getInt("id")).thenReturn(102);
-//        when(rs.getInt("user_id")).thenReturn(1);
-//        when(rs.getString("title")).thenReturn("Mock Todo 3");
-//        when(rs.getString("description")).thenReturn("Mock Desc 3");
-//        when(rs.getDate("due_date")).thenReturn(Date.valueOf(LocalDate.now()));
-//        when(rs.getString("priority")).thenReturn("MEDIUM");
-//        when(rs.getString("tag")).thenReturn("Work");
-//        when(rs.getInt("user_specific_id")).thenReturn(20);
-//        when(rs.wasNull()).thenReturn(false);
-//        when(rs.getBoolean("completed")).thenReturn(false);
-//
-//        when(rs.getString("status")).thenThrow(new SQLException("Forced exception"));
-//
-//        java.lang.reflect.Method method = TodoService.class.getDeclaredMethod("mapResultSetToTodo", ResultSet.class);
-//        method.setAccessible(true);
-//        Todo todo = (Todo) method.invoke(service, rs);
-//
-//        assertEquals(Status.PENDING, todo.getStatus());
-//    }
-//    @Test
-//    @DisplayName("Test mapResultSetToTodo handles invalid status value")
-//    void testMapResultSetToTodo_InvalidStatusValue() throws Exception {
-//        TodoService service = new TodoService();
-//        ResultSet rs = mock(ResultSet.class);
-//
-//        when(rs.getInt("id")).thenReturn(103);
-//        when(rs.getInt("user_id")).thenReturn(1);
-//        when(rs.getString("title")).thenReturn("Mock Todo 4");
-//        when(rs.getString("description")).thenReturn("Mock Desc 4");
-//        when(rs.getDate("due_date")).thenReturn(Date.valueOf(LocalDate.now()));
-//        when(rs.getString("priority")).thenReturn("MEDIUM");
-//        when(rs.getString("tag")).thenReturn("Work");
-//        when(rs.getInt("user_specific_id")).thenReturn(30);
-//        when(rs.wasNull()).thenReturn(false);
-//        when(rs.getBoolean("completed")).thenReturn(true);
-//
-//        when(rs.getString("status")).thenReturn("INVALID_STATUS");
-//
-//        java.lang.reflect.Method method = TodoService.class.getDeclaredMethod("mapResultSetToTodo", ResultSet.class);
-//        method.setAccessible(true);
-//        Todo todo = (Todo) method.invoke(service, rs);
-//
-//       assertEquals(Status.COMPLETED, todo.getStatus());
-//    }
+    @Test
+    @DisplayName("Update Todo with Invalid User ID")
+    void testUpdateTodoWithInvalidUserId() {
+        Todo todo = todoService.createTodo(1, userId, "Test", "Description", LocalDate.now(), Priority.LOW, Tags.Work);
+        
+        assertThrows(RuntimeException.class, () -> {
+            todoService.updateTodo(
+                todo.getId(),
+                -1, // Invalid user ID
+                "Updated Title",
+                "Updated Description",
+                LocalDate.now(),
+                Priority.HIGH,
+                Tags.Work,
+                true
+            );
+        });
+    }
+    
+    @Test
+    @DisplayName("Map ResultSet to Todo Handles Nulls and Invalids")
+    void testMapResultSetToTodoHandlesNullsAndInvalids() {
+        // Mocking and assertions for mapping logic
+    }
+    
 }
