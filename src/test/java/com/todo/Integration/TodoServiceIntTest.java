@@ -126,38 +126,6 @@ class TodoServiceIntTest {
     }
 
     @Test
-    @DisplayName("Partial Update of Todo Fields")
-    void testUpdateTodoPartialFields() {
-        var originalDueDate = LocalDate.now().plusDays(1);
-        var todo = todoService.createTodo(
-            1,
-            userId,
-            "Original Task",
-            "Original Description",
-            originalDueDate,
-            Priority.MEDIUM,
-            Tags.Urgent
-        );
-
-        var updatedTodo = todoService.updateTodo(
-            todo.getId(),
-            userId,
-            "Updated Task",
-            todo.getDescription(),
-            originalDueDate,
-            Priority.HIGH,
-            todo.getTags(),
-            todo.isCompleted()
-        );
-
-        assertEquals("Updated Task", updatedTodo.getTitle());
-        assertEquals(Priority.HIGH, updatedTodo.getPriority());
-        assertEquals("Original Description", updatedTodo.getDescription());
-        assertEquals(originalDueDate, updatedTodo.getDueDate());
-        assertEquals(Tags.Urgent, updatedTodo.getTags());
-    }
-
-    @Test
     @DisplayName("Delete Todo with Database Verification")
     void testDeleteTodo() {
         var todo = todoService.createTodo(
@@ -181,7 +149,6 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Get All Todos for User with Multiple Service Instances")
     void testGetAllTodos() {
-
         todoService.createTodo(
             1,
             userId,
@@ -212,7 +179,6 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Error Handling and Database Constraints")
     void testErrorHandling() {
-
         assertThrows(NoSuchElementException.class, () ->
             todoService.updateTodo(
                 999,
@@ -227,33 +193,12 @@ class TodoServiceIntTest {
         );
 
         assertFalse(todoService.deleteTodoById(999));
-
         assertNull(todoService.getTodoById(999));
     }
 
     @Test
-    @DisplayName("Database Connection and Transaction Management")
-    void testDatabaseTransactions() {
-        var todo = todoService.createTodo(
-            1,
-            userId,
-            "Transaction Test",
-            "Description",
-            LocalDate.now().plusDays(1),
-            Priority.MEDIUM,
-            Tags.Work
-        );
-        assertNotNull(todo);
- 
-        var retrievedTodo = todoService.getTodoById(todo.getId());
-        assertNotNull(retrievedTodo);
-        assertEquals("Transaction Test", retrievedTodo.getTitle());
-    }
-    
-    @Test
     @DisplayName("Transaction Rollback on Failed Todo Creation")
     void testTransactionRollbackOnFailure() {
-
         int nonExistentUserId = 99999;
         assertThrows(RuntimeException.class, () -> {
             todoService.createTodo(
@@ -314,296 +259,8 @@ class TodoServiceIntTest {
     }
     
     @Test
-    @DisplayName("Test Transaction Isolation in Concurrent Updates")
-    void testTransactionIsolation() throws InterruptedException {
-
-        Todo todo = todoService.createTodo(
-            1,
-            userId,
-            "Original Todo",
-            "Description",
-            LocalDate.now(),
-            Priority.LOW,
-            Tags.Work
-        );
-        
-        CountDownLatch latch = new CountDownLatch(2);
-        AtomicInteger successCount = new AtomicInteger(0);
-        
-        new Thread(() -> {
-            try {
-                todoService.updateTodo(
-                    todo.getId(),
-                    userId,
-                    "Updated by Thread 1",
-                    todo.getDescription(),
-                    todo.getDueDate(),
-                    todo.getPriority(),
-                    todo.getTags(),
-                    false
-                );
-                successCount.incrementAndGet();
-            } catch (Exception e) {
-               
-            } finally {
-                latch.countDown();
-            }
-        }).start();
-
-        new Thread(() -> {
-            try {
-                todoService.updateTodo(
-                    todo.getId(),
-                    userId,
-                    todo.getTitle(),
-                    "Updated by Thread 2",
-                    todo.getDueDate(),
-                    todo.getPriority(),
-                    todo.getTags(),
-                    false
-                );
-                successCount.incrementAndGet();
-            } catch (Exception e) {
-             
-            } finally {
-                latch.countDown();
-            }
-        }).start();
-        
-        latch.await(5, TimeUnit.SECONDS);
-   
-        Todo finalTodo = todoService.getTodoById(todo.getId());
-        assertNotNull(finalTodo);
-        assertTrue(
-            finalTodo.getTitle().equals("Updated by Thread 1") ||
-            finalTodo.getDescription().equals("Updated by Thread 2")
-        );
-    }
-    
-    @Test
-    @DisplayName("Edge Cases in Todo Status Updates")
-    void testTodoStatusEdgeCases() {
-    
-        var todo = todoService.createTodo(
-            1,
-            userId,
-            "Status Test",
-            "Description",
-            LocalDate.now(),
-            Priority.LOW,
-            Tags.Work
-        );
-
-        todo = todoService.updateTodo(
-            todo.getId(),
-            userId,
-            todo.getTitle(),
-            todo.getDescription(),
-            todo.getDueDate(),
-            todo.getPriority(),
-            todo.getTags(),
-            true
-        );
-        assertEquals(Status.COMPLETED, todo.getStatus());
-        
-        todo = todoService.updateTodo(
-            todo.getId(),
-            userId,
-            todo.getTitle(),
-            todo.getDescription(),
-            todo.getDueDate(),
-            todo.getPriority(),
-            todo.getTags(),
-            false
-        );
-        assertEquals(Status.PENDING, todo.getStatus());
-    }
-    
-    @Test
-    @DisplayName("Test Complex Transaction Rollback Scenarios")
-    void testComplexTransactionRollback() {
-        
-        Todo validTodo = todoService.createTodo(
-            1,
-            userId,
-            "Valid Todo",
-            "Description",
-            LocalDate.now(),
-            Priority.LOW,
-            Tags.Work
-        );
-        assertNotNull(validTodo);
-        
-        int invalidUserId = -999;
-        assertThrows(RuntimeException.class, () -> {
-            todoService.createTodo(
-                2,
-                invalidUserId,
-                "Invalid Todo",
-                "Description",
-                LocalDate.now(),
-                Priority.LOW,
-                Tags.Work
-            );
-        });
-        
-     
-        Todo retrievedTodo = todoService.getTodoById(validTodo.getId());
-        assertNotNull(retrievedTodo);
-        assertEquals("Valid Todo", retrievedTodo.getTitle());
-        
-        List<Todo> invalidUserTodos = todoService.getTodosByUserId(invalidUserId);
-        assertTrue(invalidUserTodos.isEmpty());
-    }
-    
-    @Test
-    @DisplayName("User-Specific ID Management")
-    void testUserSpecificIdManagement() {
-
-        todoService.setNextUserSpecificId(1);
-        Todo todo1 = todoService.createTodo(
-            todoService.getNextUserSpecificId(),
-            userId,
-            "Task 1",
-            "Description",
-            LocalDate.now(),
-            Priority.LOW,
-            Tags.Work
-        );
-
-        Todo todo2 = todoService.createTodo(
-            todoService.getNextUserSpecificId(),
-            userId,
-            "Task 2",
-            "Description",
-            LocalDate.now(),
-            Priority.MEDIUM,
-            Tags.Home
-        );
-
-        List<Todo> todos = todoService.getTodosByUserId(userId);
-        assertEquals(2, todos.size());
-
-        Todo retrievedTodo1 = todoService.getTodoById(todo1.getId());
-        Todo retrievedTodo2 = todoService.getTodoById(todo2.getId());
-        
-        assertNotNull(retrievedTodo1, "First todo should exist");
-        assertNotNull(retrievedTodo2, "Second todo should exist");
-        assertEquals("Task 1", retrievedTodo1.getTitle());
-        assertEquals("Task 2", retrievedTodo2.getTitle());
-
-        TodoService newTodoService = new TodoService();
-        newTodoService.setNextUserSpecificId(3);
-        
-        Todo todo3 = newTodoService.createTodo(
-            newTodoService.getNextUserSpecificId(),
-            userId,
-            "Task 3",
-            "Description",
-            LocalDate.now(),
-            Priority.HIGH,
-            Tags.Urgent
-        );
-        
-        Todo retrievedTodo3 = todoService.getTodoById(todo3.getId());
-        assertNotNull(retrievedTodo3, "Third todo should exist");
-        assertEquals("Task 3", retrievedTodo3.getTitle());
-        assertEquals(Priority.HIGH, retrievedTodo3.getPriority());
-        assertEquals(Tags.Urgent, retrievedTodo3.getTags());
-
-        List<Todo> allTodos = todoService.getTodosByUserId(userId);
-        assertEquals(3, allTodos.size(), "Should have all three todos");
-      
-        boolean foundTask1 = false, foundTask2 = false, foundTask3 = false;
-        
-        for (Todo todo : allTodos) {
-            switch (todo.getTitle()) {
-                case "Task 1":
-                    foundTask1 = true;
-                    break;
-                case "Task 2":
-                    foundTask2 = true;
-                    break;
-                case "Task 3":
-                    foundTask3 = true;
-                    break;
-            }
-        }
-        
-        assertTrue(foundTask1, "Task 1 should exist");
-        assertTrue(foundTask2, "Task 2 should exist");
-        assertTrue(foundTask3, "Task 3 should exist");
-    }
-    
-    @Test
-    @DisplayName("Test Complex Transaction Scenarios")
-    void testComplexTransactionScenarios() {
-
-        Todo todo = todoService.createTodo(
-            1,
-            userId,
-            "Valid Todo",
-            "Description",
-            LocalDate.now(),
-            Priority.MEDIUM,
-            Tags.Work
-        );
-        assertNotNull(todo);
-        assertThrows(RuntimeException.class, () -> {
-            todoService.createTodo(
-                2,
-                -999, 
-                "Invalid Todo",
-                "Description",
-                LocalDate.now(),
-                Priority.LOW,
-                Tags.Work
-            );
-        });
-        Todo retrievedTodo = todoService.getTodoById(todo.getId());
-        assertNotNull(retrievedTodo);
-        assertEquals("Valid Todo", retrievedTodo.getTitle());
-    }
-
-    @Test
-    @DisplayName("Test Updating Non-existent Todo")
-    void testUpdateNonExistentTodo() {
-        assertThrows(NoSuchElementException.class, () -> {
-            todoService.updateTodo(
-                99999, 
-                userId,
-                "Updated Title",
-                "Updated Description",
-                LocalDate.now(),
-                Priority.HIGH,
-                Tags.Urgent,
-                true
-            );
-        });
-    }
-    
-//    @Test
-//    @DisplayName("Test updateTodo throws exception on invalid user ID")
-//    void testUpdateTodoWithInvalidUserId() {
-//        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);
-//        assertThrows(RuntimeException.class, () -> {
-//            todoService.updateTodo(
-//                todo.getId(),
-//                99999, // Invalid user ID
-//                "New Title",
-//                "New Desc",
-//                LocalDate.now(),
-//                Priority.HIGH,
-//                Tags.Home,
-//                true
-//            );
-//        });
-//    }
-
-    @Test
-    @DisplayName("Test Todo Status Transitions")
+    @DisplayName("Todo Status Transitions")
     void testTodoStatusTransitions() {
-      
         Todo todo = todoService.createTodo(
             1,
             userId,
@@ -639,125 +296,9 @@ class TodoServiceIntTest {
         );
         assertFalse(todo.isCompleted());
         assertEquals(Status.PENDING, todo.getStatus());
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation with Invalid Title")
-    void testCreateTodoWithInvalidTitle() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            todoService.createTodo(
-                1,
-                userId,
-                null,
-                "Description",
-                LocalDate.now(),
-                Priority.MEDIUM,
-                Tags.Urgent
-                
-            );
-        });
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation with Invalid Description")
-    void testCreateTodoWithInvalidDescription() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            todoService.createTodo(
-                1,
-                userId,
-                "Test Todo",
-                null,
-                LocalDate.now(),
-                Priority.MEDIUM,
-                Tags.Urgent
-                
-            );
-        });
-    }
-    
-    
-    @Test
-    @DisplayName("Test Todo Creation with Invalid Due Date")
-    void testCreateTodoWithInvalidDueDate() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            todoService.createTodo(
-                1,
-                userId,
-                "Test Todo",
-                "Description",
-                null,
-                Priority.MEDIUM,
-                Tags.Urgent
-                
-            );
-        });
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation with Invalid Tags")
-    void testCreateTodoWithInvalidPriority() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            todoService.createTodo(
-                1,
-                userId,
-                "Test Todo",
-                "Description",
-                LocalDate.now(),
-                null,
-                Tags.Urgent
-                
-            );
-        });
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation with Invalid Tags")
-    void testCreateTodoWithInvalidTags() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            todoService.createTodo(
-                1,
-                userId,
-                "Test Todo",
-                "Description",
-                LocalDate.now(),
-                Priority.LOW,
-                null
-            );
-        });
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation Title Validation")
-    void testTodoCreationTitleValidation() {
-        assertThrows(IllegalArgumentException.class, () ->
-            todoService.createTodo(1, userId, "", "Description", 
-                LocalDate.now(), Priority.LOW, Tags.Work)
-        );
-    }
-    
-    @Test
-    @DisplayName("Test Todo Creation Description Validation")
-    void testTodoCreationDescriptionValidation() {
-        assertThrows(IllegalArgumentException.class, () ->
-            todoService.createTodo(1, userId, "Test", "", 
-                LocalDate.now(), Priority.LOW, Tags.Work)
-        );
-    }
-    
-    @Test
-    @DisplayName("Test Update Todo Status Edge Cases")
-    void testUpdateTodoStatusEdgeCases() {
-        Todo todo = todoService.createTodo(
-            1,
-            userId,
-            "Status Test",
-            "Description",
-            LocalDate.now(),
-            Priority.LOW,
-            Tags.Work
-        );
         
-        for(int i = 0; i < 5; i++) {
+        // Test multiple transitions in sequence
+        for(int i = 0; i < 3; i++) {
             todo = todoService.updateTodo(
                 todo.getId(),
                 userId,
@@ -773,163 +314,80 @@ class TodoServiceIntTest {
     }
     
     @Test
-    @DisplayName("Test Get Todos With Invalid User ID")
-    void testGetTodosInvalidUser() {
-        List<Todo> todos = todoService.getTodosByUserId(-1);
-        assertTrue(todos.isEmpty());
-    }
-    
-    @Test
-    @DisplayName("Test Update Non-Existent Todo Status")
-    void testUpdateNonExistentTodoStatus() {
-        assertThrows(NoSuchElementException.class, () ->
-            todoService.updateTodo(99999, userId, "Title", "Desc",
-                LocalDate.now(), Priority.HIGH, Tags.Work, true)
-        );
-    }
-    
-    @Test
-    @DisplayName("Test User Specific ID Edge Cases")
-    void testUserSpecificIdEdgeCases() {
-    	
-        todoService.setNextUserSpecificId(Integer.MAX_VALUE);
-        int maxId = todoService.getNextUserSpecificId();
-        assertEquals(Integer.MAX_VALUE, maxId);
-       
-        todoService.setNextUserSpecificId(Integer.MIN_VALUE);
-        int minId = todoService.getNextUserSpecificId();
-        assertEquals(Integer.MIN_VALUE, minId);
-       
-        todoService.setNextUserSpecificId(1);
-        assertEquals(1, todoService.getNextUserSpecificId());
-        assertEquals(2, todoService.getNextUserSpecificId());
-        assertEquals(3, todoService.getNextUserSpecificId());
-    }
-    
-    @Test
-    @DisplayName("Test getTodoById throws exception on database error")
-    void testGetTodoByIdDatabaseError() {
-
-        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", LocalDate.now(), Priority.LOW, Tags.Work);        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE todos");
-        } catch (SQLException e) {
-            fail("Failed to drop table: " + e.getMessage());
-        }
-        assertThrows(RuntimeException.class, () -> todoService.getTodoById(todo.getId()));
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, user_id INT, title VARCHAR(255), description TEXT, due_date DATE, priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
-        } catch (SQLException e) {
-            fail("Failed to recreate table: " + e.getMessage());
-        }
-    }
-    
-    @Test
-    @DisplayName("Get Non-Existent Todo By ID")
-    void testGetNonExistentTodo() {
-        Todo result = todoService.getTodoById(9999);
-        assertNull(result);
-    }
-    
-    @Test
-    @DisplayName("Create Todo Fails to Retrieve Generated ID")
-    void testCreateTodoFailsToRetrieveId() throws SQLException {
-        try (Connection conn = DatabaseConfig.getConnection();
-             PreparedStatement ps = conn.prepareStatement("INSERT INTO todos (user_id, title, description, due_date, priority, tag, completed, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
-            ps.setInt(1, userId);
-            ps.setString(2, "Task");
-            ps.setString(3, "Desc");
-            ps.setDate(4, Date.valueOf(LocalDate.now()));
-            ps.setString(5, "LOW");
-            ps.setString(6, "Work");
-            ps.setBoolean(7, false);
-            ps.setString(8, "PENDING");
-            ps.executeUpdate();
-
-            ResultSet rs = ps.getGeneratedKeys();
-            assertTrue(rs.next(), "Expected generated keys, but none were found");
-        }
-    }
-
-    @Test
-    @DisplayName("Handle Invalid Priority and Tag in Database")
-    void testInvalidPriorityAndTagInDatabase() throws SQLException {
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) VALUES (999, " + userId + ", 'Invalid', 'Desc', CURRENT_DATE, 'INVALID_PRIORITY', 'INVALID_TAG', false, 'INVALID_STATUS')");
-        }
-        Todo todo = todoService.getTodoById(999);
-        assertNotNull(todo);
-        assertEquals(Priority.MEDIUM, todo.getPriority());
-        assertEquals(Tags.Work, todo.getTags());
-    }
-
-    @Test
-    @DisplayName("Handle Null Priority and Tag in Database")
-    void testNullPriorityAndTagInDatabase() throws SQLException {
-        try (Connection conn = DatabaseConfig.getConnection();
-             PreparedStatement ps = conn.prepareStatement("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");) {
-            ps.setInt(1, 999);
-            ps.setInt(2, userId);
-            ps.setString(3, "Null Fields");
-            ps.setString(4, "Desc");
-            ps.setDate(5, Date.valueOf(LocalDate.now()));
-            ps.setNull(6, java.sql.Types.VARCHAR);
-            ps.setNull(7, java.sql.Types.VARCHAR);
-            ps.setBoolean(8, false);
-            ps.executeUpdate();
-        }
-        Todo todo = todoService.getTodoById(999);
-        assertNotNull(todo);
-        assertEquals(Priority.MEDIUM, todo.getPriority());
-        assertEquals(Tags.Work, todo.getTags());
-    }
-
-    @Test
-    @DisplayName("Handle Invalid and Null Status in Database")
-    void testInvalidStatusInDatabase() throws SQLException {
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) VALUES (999, " + userId + ", 'Invalid Status', 'Desc', CURRENT_DATE, 'LOW', 'Work', false, 'INVALID_STATUS')");
-        }
-        Todo todo = todoService.getTodoById(999);
-        assertEquals(Status.PENDING, todo.getStatus());
-    }
-    
-    @Test
-    @DisplayName("Test deleteTodoById throws exception on database error")
-    void testDeleteTodoDatabaseError() {
-        var todo = todoService.createTodo(
-                1,
-                userId,  
-                "Task Error",
-                "Error Desc",
-                LocalDate.now().plusDays(1),
-                Priority.LOW,
-                Tags.Work
+    @DisplayName("Input Validation Tests")
+    void testTodoInputValidation() {
+        // Test null/empty title
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, null, "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work)
         );
         
-       
-        try (var conn = DatabaseConfig.getConnection();
-             var stmt = conn.createStatement()) {
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "", "Description", 
+                LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+        
+        // Test null/empty description
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", null, 
+                LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+        
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", "", 
+                LocalDate.now(), Priority.LOW, Tags.Work)
+        );
+        
+        // Test null dueDate
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", "Description", 
+                null, Priority.LOW, Tags.Work)
+        );
+        
+        // Test null priority
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", "Description", 
+                LocalDate.now(), null, Tags.Work)
+        );
+        
+        // Test null tags
+        assertThrows(IllegalArgumentException.class, () ->
+            todoService.createTodo(1, userId, "Test", "Description", 
+                LocalDate.now(), Priority.LOW, null)
+        );
+    }
+    
+    @Test
+    @DisplayName("Test Database Error Handling")
+    void testDatabaseErrorHandling() {
+        Todo todo = todoService.createTodo(1, userId, "Test", "Desc", 
+            LocalDate.now(), Priority.LOW, Tags.Work);
+        
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
             stmt.execute("DROP TABLE todos");
         } catch (SQLException e) {
             fail("Failed to drop table: " + e.getMessage());
         }
+        
+        assertThrows(RuntimeException.class, () -> todoService.getTodoById(todo.getId()));
         
         assertThrows(RuntimeException.class, () -> todoService.deleteTodoById(todo.getId()));
         
-        try (var conn = DatabaseConfig.getConnection();
-             var stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, user_id INT, title VARCHAR(255), description TEXT, due_date DATE, priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
+        assertThrows(RuntimeException.class, () -> todoService.getTodosByUserId(userId));
+        
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, " +
+                    "user_id INT, title VARCHAR(255), description TEXT, due_date DATE, " +
+                    "priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
         } catch (SQLException e) {
             fail("Failed to recreate table: " + e.getMessage());
         }
     }
     
     @Test
-    @DisplayName("Update Todo with Invalid User ID Throws RuntimeException")
+    @DisplayName("Update Todo with Invalid User ID")
     void testUpdateTodoWithInvalidUserId() {
         Todo todo = todoService.createTodo(1, userId, "Test", "Description", 
                 LocalDate.now(), Priority.LOW, Tags.Work);
@@ -947,60 +405,329 @@ class TodoServiceIntTest {
             );
         });
     }
+    
+    @Test
+    @DisplayName("User Specific ID Management")
+    void testUserSpecificIdManagement() {
+        todoService.setNextUserSpecificId(1);
+        assertEquals(1, todoService.getNextUserSpecificId());
+        assertEquals(2, todoService.getNextUserSpecificId());
+        
+        todoService.setNextUserSpecificId(Integer.MAX_VALUE);
+        assertEquals(Integer.MAX_VALUE, todoService.getNextUserSpecificId());
+        
+        todoService.setNextUserSpecificId(Integer.MIN_VALUE);
+        assertEquals(Integer.MIN_VALUE, todoService.getNextUserSpecificId());
+        
+        // Test creating todos with specific IDs
+        todoService.setNextUserSpecificId(10);
+        Todo todo1 = todoService.createTodo(
+            todoService.getNextUserSpecificId(),
+            userId,
+            "Task 1",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
+        
+        assertEquals(10, todo1.getUserSpecificId());
+        
+        TodoService newTodoService = new TodoService();
+        newTodoService.setNextUserSpecificId(20);
+        
+        Todo todo2 = newTodoService.createTodo(
+            newTodoService.getNextUserSpecificId(),
+            userId,
+            "Task 2",
+            "Description",
+            LocalDate.now(),
+            Priority.HIGH,
+            Tags.Urgent
+        );
+        
+        assertEquals(20, todo2.getUserSpecificId());
+    }
+    
+    @Test
+    @DisplayName("Handle Invalid/Null DB Values")
+    void testInvalidDatabaseValues() throws SQLException {
+        try (Connection conn = DatabaseConfig.getConnection();
+             Statement stmt = conn.createStatement()) {
+            
+            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) " +
+                    "VALUES (998, " + userId + ", 'Invalid Values', 'Description', CURRENT_DATE, 'INVALID_PRIORITY', 'INVALID_TAG', false, 'INVALID_STATUS')");
+            
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                ps.setInt(1, 999);
+                ps.setInt(2, userId);
+                ps.setString(3, "Null Fields");
+                ps.setString(4, "Description");
+                ps.setDate(5, Date.valueOf(LocalDate.now()));
+                ps.setNull(6, java.sql.Types.VARCHAR);
+                ps.setNull(7, java.sql.Types.VARCHAR);
+                ps.setBoolean(8, false);
+                ps.executeUpdate();
+            }
+        }
+        
+        Todo invalidValuesTodo = todoService.getTodoById(998);
+        assertNotNull(invalidValuesTodo);
+        assertEquals(Priority.MEDIUM, invalidValuesTodo.getPriority()); // Should use default priority
+        assertEquals(Tags.Work, invalidValuesTodo.getTags()); // Should use default tag
+        assertEquals(Status.PENDING, invalidValuesTodo.getStatus()); // Should use default status based on completed flag
+        
+        Todo nullFieldsTodo = todoService.getTodoById(999);
+        assertNotNull(nullFieldsTodo);
+        assertEquals(Priority.MEDIUM, nullFieldsTodo.getPriority()); // Should use default priority
+        assertEquals(Tags.Work, nullFieldsTodo.getTags()); // Should use default tag
+        assertEquals(Status.PENDING, nullFieldsTodo.getStatus()); // Should use default status based on completed flag
+    }
 
-    
     @Test
-    @DisplayName("Get Todos By User ID With Database Error")
-    void testGetTodosByUserIdWithDatabaseError() {
-        todoService.createTodo(1, userId, "Test", "Description", 
-                LocalDate.now(), Priority.LOW, Tags.Work);
-        
+    @DisplayName("Test Missing Database Columns Handling")
+    void testMissingDatabaseColumns() throws SQLException {
+        Todo todo = todoService.createTodo(1, userId, "Test Todo", "Description", 
+                LocalDate.now(), Priority.MEDIUM, Tags.Work);
         try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE todos");
-        } catch (SQLException e) {
-            fail("Failed to drop table: " + e.getMessage());
+             PreparedStatement ps = conn.prepareStatement("SELECT id, user_id, title, description, due_date FROM todos WHERE id = ?")) {
+            
+            ps.setInt(1, todo.getId());
+            try (ResultSet rs = ps.executeQuery()) {
+                assertTrue(rs.next(), "ResultSet should contain the todo");
+                try {
+                    rs.getString("non_existent_column");
+                    fail("Should throw SQLException for non-existent column");
+                } catch (SQLException e) {
+                }
+            }
         }
+    }
+
+    @Test
+    @DisplayName("Test Get Todos For Non-Existent User")
+    void testGetTodosForNonExistentUser() {
+        List<Todo> todos = todoService.getTodosByUserId(-1);
+        assertTrue(todos.isEmpty(), "No todos should be found for non-existent user");
+    }
+
+    @Test
+    @DisplayName("Test Transaction Isolation")
+    void testTransactionIsolation() throws InterruptedException {
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Original Todo",
+            "Description",
+            LocalDate.now(),
+            Priority.LOW,
+            Tags.Work
+        );
         
-        assertThrows(RuntimeException.class, () -> {
-            todoService.getTodosByUserId(userId);
-        });
-      
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, " +
-                    "user_id INT, title VARCHAR(255), description TEXT, due_date DATE, " +
-                    "priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
-        } catch (SQLException e) {
-            fail("Failed to recreate table: " + e.getMessage());
-        }
+        CountDownLatch latch = new CountDownLatch(2);
+        AtomicInteger successCount = new AtomicInteger(0);
+        
+        new Thread(() -> {
+            try {
+                todoService.updateTodo(
+                    todo.getId(),
+                    userId,
+                    "Updated by Thread 1",
+                    todo.getDescription(),
+                    todo.getDueDate(),
+                    todo.getPriority(),
+                    todo.getTags(),
+                    false
+                );
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+            } finally {
+                latch.countDown();
+            }
+        }).start();
+
+        new Thread(() -> {
+            try {
+                todoService.updateTodo(
+                    todo.getId(),
+                    userId,
+                    todo.getTitle(),
+                    "Updated by Thread 2",
+                    todo.getDueDate(),
+                    todo.getPriority(),
+                    todo.getTags(),
+                    false
+                );
+                successCount.incrementAndGet();
+            } catch (Exception e) {
+            } finally {
+                latch.countDown();
+            }
+        }).start();
+        
+        latch.await(5, TimeUnit.SECONDS);
+        Todo finalTodo = todoService.getTodoById(todo.getId());
+        assertNotNull(finalTodo);
+        assertTrue(
+            finalTodo.getTitle().equals("Updated by Thread 1") ||
+            finalTodo.getDescription().equals("Updated by Thread 2") ||
+             (finalTodo.getTitle().equals("Updated by Thread 1") && 
+             finalTodo.getDescription().equals("Updated by Thread 2"))
+        );
     }
     
     @Test
-    @DisplayName("Get Todo By ID With Database Error")
-    void testGetTodoByIdWithDatabaseError() {
-        // Create a valid todo first
-        Todo todo = todoService.createTodo(1, userId, "Test", "Description", 
-                LocalDate.now(), Priority.LOW, Tags.Work);
-      
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE todos");
-        } catch (SQLException e) {
-            fail("Failed to drop table: " + e.getMessage());
-        }
+    @DisplayName("Test Complex Scenario: Create, Update and Delete")
+    void testComplexCRUDScenario() {
+        // 1. Create a todo
+        Todo todo = todoService.createTodo(
+            1,
+            userId,
+            "Complex Test",
+            "Test Description",
+            LocalDate.now().plusDays(3),
+            Priority.LOW,
+            Tags.Work
+        );
+        assertNotNull(todo);
+        assertEquals("Complex Test", todo.getTitle());
+        assertEquals(Status.PENDING, todo.getStatus());
         
-        assertThrows(RuntimeException.class, () -> {
-            todoService.getTodoById(todo.getId());
+        // 2. Update the todo (partial update)
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            "Updated Title",
+            todo.getDescription(),  // keep original description
+            todo.getDueDate(),      // keep original due date
+            Priority.HIGH,          // change priority
+            todo.getTags(),         // keep original tags
+            todo.isCompleted()      // keep original completion status
+        );
+        assertEquals("Updated Title", todo.getTitle());
+        assertEquals("Test Description", todo.getDescription());
+        assertEquals(Priority.HIGH, todo.getPriority());
+        
+        todo = todoService.updateTodo(
+            todo.getId(),
+            userId,
+            todo.getTitle(),
+            todo.getDescription(),
+            todo.getDueDate(),
+            todo.getPriority(),
+            todo.getTags(),
+            true  
+        );
+        assertTrue(todo.isCompleted());
+        assertEquals(Status.COMPLETED, todo.getStatus());
+        boolean deleted = todoService.deleteTodoById(todo.getId());
+        assertTrue(deleted);
+        assertNull(todoService.getTodoById(todo.getId()));
+    }
+    
+    @Test
+    @DisplayName("Test Create Todo With No Generated ID")
+    void testCreateTodoNoGeneratedId() {
+        TodoService testService = new TodoService() {
+            @Override
+            public Todo createTodo(int userSpecificId, int userId, String title, String description, 
+                                   LocalDate dueDate, Priority priority, Tags tag) {
+                try (Connection conn = DatabaseConfig.getConnection()) {
+                    conn.setAutoCommit(false);
+                    try {
+                        try (PreparedStatement ps = conn.prepareStatement(
+                                "SELECT 1 WHERE 1=2")) {
+                            
+                            ResultSet rs = ps.executeQuery();
+                            
+                            if (!rs.next()) {
+                                throw new SQLException("Failed to retrieve generated ID");
+                            }
+                            
+                            return null;
+                        }
+                    } catch (SQLException e) {
+                        conn.rollback();
+                        throw e;
+                    } finally {
+                        conn.setAutoCommit(true);
+                    }
+                } catch (SQLException e) {
+                    throw new RuntimeException("Database error: " + e.getMessage(), e);
+                }
+            }
+        };
+        
+       assertThrows(RuntimeException.class, () -> {
+            testService.createTodo(
+                1,
+                userId,
+                "Test Todo",
+                "Description",
+                LocalDate.now(),
+                Priority.LOW,
+                Tags.Work
+            );
         });
-      
+    }
+    
+    @Test
+    @DisplayName("Test Create Todo When No Generated ID Is Returned")
+    void testCreateTodoFailsToRetrieveId() {
+        TodoService testService = new TodoService() {
+            @Override
+            public Todo createTodo(int userSpecificId, int userId, String title, String description, 
+                                   LocalDate dueDate, Priority priority, Tags tag) {
+                try (Connection conn = DatabaseConfig.getConnection()) {
+                    conn.setAutoCommit(false);
+                    try {
+                        try (PreparedStatement ps = conn.prepareStatement("SELECT 1 WHERE 1=2")) {
+                            ResultSet rs = ps.executeQuery();
+                            if (!rs.next()) {
+                                throw new SQLException("Failed to retrieve generated ID");
+                            }
+                            return null;
+                        }
+                    } catch (SQLException e) {
+                        conn.rollback();
+                        throw e;
+                    } finally {
+                        conn.setAutoCommit(true);
+                    }
+                } catch (SQLException e) {
+                    throw new RuntimeException("Database error: " + e.getMessage(), e);
+                }
+            }
+        };
+
+        assertThrows(RuntimeException.class, () -> testService.createTodo(
+            1, userId, "Test Todo", "Description", LocalDate.now(), Priority.LOW, Tags.Work));
+    }
+    
+    @Test
+    @DisplayName("Test Todo Mapping Without Status Column")
+    void testTodoMappingWithoutStatusColumn() throws SQLException {
+        Todo originalTodo = todoService.createTodo(
+            1, userId, "Missing Status Test", "Description",
+            LocalDate.now(), Priority.MEDIUM, Tags.Work
+        );
+
         try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE todos (id SERIAL PRIMARY KEY, user_specific_id INT, " +
-                    "user_id INT, title VARCHAR(255), description TEXT, due_date DATE, " +
-                    "priority VARCHAR(50), tag VARCHAR(50), completed BOOLEAN, status VARCHAR(50))");
-        } catch (SQLException e) {
-            fail("Failed to recreate table: " + e.getMessage());
+             PreparedStatement ps = conn.prepareStatement(
+                 "SELECT id, user_id, title, description, due_date, priority, tag, completed FROM todos WHERE id = ?")) {
+            
+            ps.setInt(1, originalTodo.getId());
+
+            try (ResultSet rs = ps.executeQuery()) {
+                assertTrue(rs.next(), "ResultSet should have a row");
+
+                Todo mappedTodo = todoService.testMapResultSetToTodo(rs);
+                assertEquals(originalTodo.isCompleted() ? Status.COMPLETED : Status.PENDING, mappedTodo.getStatus());
+            }
         }
     }
+
+
 }

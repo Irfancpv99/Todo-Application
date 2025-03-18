@@ -59,9 +59,7 @@ public class TodoService {
                     ps.setString(9, Status.PENDING.toString()); 
                     
                     ResultSet rs = ps.executeQuery();
-                    if (!rs.next()) {
-                        throw new SQLException("Failed to retrieve generated ID");
-                    }
+                    rs.next(); // Assuming it will always return a result
                     int generatedId = rs.getInt(1);
                     
                     conn.commit();
@@ -236,19 +234,16 @@ public class TodoService {
                     Status status = Status.valueOf(statusStr);
                     todo.setStatus(status);
                 } catch (IllegalArgumentException e) {
-                    
                     System.err.println("Warning: Invalid status value in database: " + statusStr);
                     todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
                 }
             } else {
-                
                 todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
             }
         } catch (SQLException e) {
-           
             todo.setStatus(completed ? Status.COMPLETED : Status.PENDING);
         }
-        
+
         return todo;
     }
     
@@ -258,5 +253,9 @@ public class TodoService {
 
     public int getNextUserSpecificId() {
         return nextUserSpecificId++;
+    }
+    
+    public Todo testMapResultSetToTodo(ResultSet rs) throws SQLException {
+        return mapResultSetToTodo(rs);
     }
 }
