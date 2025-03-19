@@ -728,6 +728,27 @@ class TodoServiceIntTest {
             }
         }
     }
+    
+    @Test
+    @DisplayName("Test Todo Mapping Without Completed Column")
+    void testTodoMappingWithoutCompletedColumn() throws SQLException {
+        Todo originalTodo = todoService.createTodo(
+            1, userId, "Missing Completed", "Description",
+            LocalDate.now(), Priority.MEDIUM, Tags.Work
+        );
 
+        try (Connection conn = DatabaseConfig.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                 "SELECT id, user_id, title, description, due_date, priority, tag FROM todos WHERE id = ?")) {
+            
+            ps.setInt(1, originalTodo.getId());
 
+            try (ResultSet rs = ps.executeQuery()) {
+                assertTrue(rs.next(), "ResultSet should have a row");
+
+                Todo mappedTodo = todoService.testMapResultSetToTodo(rs);
+                assertFalse(mappedTodo.isCompleted(), "Todo should default to not completed");
+            }
+        }
+    }
 }
