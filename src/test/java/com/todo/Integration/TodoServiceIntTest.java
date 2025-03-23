@@ -456,12 +456,13 @@ class TodoServiceIntTest {
         try (Connection conn = DatabaseConfig.getConnection();
              Statement stmt = conn.createStatement()) {
             
-            stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) " +
-                    "VALUES (998, " + userId + ", 'Invalid Values', 'Description', CURRENT_DATE, 'INVALID_PRIORITY', 'INVALID_TAG', false, 'INVALID_STATUS')");
-            
+        	stmt.executeUpdate("INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed, status) " +
+        	        "VALUES (998, " + userId + ", 'Invalid Values', 'Description', CURRENT_DATE, 'INVALID', 'INVALID', false, 'INVALID')");
+        	
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO todos (id, user_id, title, description, due_date, priority, tag, completed) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+            	
                 ps.setInt(1, 999);
                 ps.setInt(2, userId);
                 ps.setString(3, "Null Fields");
