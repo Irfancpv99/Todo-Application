@@ -33,26 +33,19 @@ public class TodoUIe2eTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        // First, try to clean up any leftover TestUser from previous test runs
         try (Connection conn = DatabaseConfig.getConnection()) {
-            // Start transaction
             conn.setAutoCommit(false);
             
-            // First delete todos for any existing TestUser
             conn.createStatement().execute(
                 "DELETE FROM todos WHERE user_id IN (SELECT id FROM users WHERE username='TestUser')");
             
-            // Then delete any existing TestUser
             conn.createStatement().execute("DELETE FROM users WHERE username='TestUser'");
             
-            // Commit the transaction
             conn.commit();
         } catch (Exception e) {
-            // Just log the error, don't fail the test
             System.err.println("Error cleaning up before test: " + e.getMessage());
         }
         
-        // Now proceed with normal setup
         UserService userService = new UserService();
         int userId = userService.registerUser("TestUser", "password").getUserid();
         
@@ -67,20 +60,15 @@ public class TodoUIe2eTest {
     void tearDown() throws Exception {
         try (Connection conn = DatabaseConfig.getConnection()) {
             try {
-                // Start transaction
                 conn.setAutoCommit(false);
                 
-                // First delete todos for the test user
                 conn.createStatement().execute(
                     "DELETE FROM todos WHERE user_id IN (SELECT id FROM users WHERE username='TestUser')");
                 
-                // Then delete the user
                 conn.createStatement().execute("DELETE FROM users WHERE username='TestUser'");
                 
-                // Commit the transaction
                 conn.commit();
             } catch (Exception e) {
-                // Log error but don't fail test cleanup
                 System.err.println("Error cleaning up after test: " + e.getMessage());
             }
         }
@@ -108,7 +96,7 @@ public class TodoUIe2eTest {
         SwingUtilities.invokeAndWait(() -> {
             JTable todoTable = getTodoTable();
             todoTable.setRowSelectionInterval(0, 0); 
-            setTodoFields("Updated Title", "Updated Desc","2025-02-10", Priority.HIGH, Tags.Urgent); // Update fields correctly
+            setTodoFields("Updated Title", "Updated Desc","2025-02-10", Priority.HIGH, Tags.Urgent);
             getUpdateButton().doClick();
         });
         Thread.sleep(300);
@@ -294,7 +282,6 @@ public class TodoUIe2eTest {
         SwingUtilities.invokeAndWait(() -> {
             JTable todoTable = getTodoTable();
             
-            // Make a selection while fields are empty
             todoTable.setRowSelectionInterval(0, 0);
         });
         Thread.sleep(300);

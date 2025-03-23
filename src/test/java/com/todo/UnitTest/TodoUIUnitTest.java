@@ -5,13 +5,10 @@ import com.todo.model.Tags;
 import com.todo.model.Todo;
 import com.todo.service.TodoService;
 import com.todo.ui.TodoUI;
-
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import javax.swing.*;
-
-
 import java.awt.Container;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -19,11 +16,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
-//import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import javax.swing.table.DefaultTableModel;
-
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,7 +48,6 @@ class TodoUIUnitTest {
         closeable = MockitoAnnotations.openMocks(this);
         todoUI = new TodoUI(todoService, "TestUser", 1);
         
-        // Get references to UI components using reflection
         try {
             titleField = getPrivateField(todoUI, "titleField", JTextField.class);
             descriptionField = getPrivateField(todoUI, "descriptionField", JTextField.class);
@@ -536,31 +530,6 @@ class TodoUIUnitTest {
                 fail("Test interrupted");
             }
     }
-        
-//        @Test
-//        @DisplayName("Test ListSelectionListener ValueIsAdjusting Condition")
-//        void testListSelectionListenerCondition() throws Exception {
-//            Todo testTodo = new Todo(1, 1, "Test Todo", "Test Description",
-//                    LocalDate.now().plusDays(1), Priority.HIGH, Tags.Work);
-//            
-//            when(todoService.getTodosByUserId(1)).thenReturn(Collections.singletonList(testTodo));
-//            when(todoService.getTodoById(1)).thenReturn(testTodo);
-//            
-//             invokeRefreshTable();
-//            
-//            titleField.setText("");
-//            descriptionField.setText("");
-//            dateField.setText("");
-//            
-//            todoTable.setRowSelectionInterval(0, 0);
-//            
-//            SwingUtilities.invokeAndWait(() -> {
-//                invokePopulateFieldsFromSelectedRow();
-//            });
-//            
-//            String actualText = titleField.getText();
-//            assertEquals("Test Todo", actualText, "Fields should be populated after direct method call");
-//        }
         
     // Helper methods
         

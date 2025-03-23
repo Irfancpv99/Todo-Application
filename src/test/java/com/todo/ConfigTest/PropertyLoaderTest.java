@@ -47,6 +47,7 @@ class PropertiesLoaderTest {
         System.setOut(new PrintStream(outputStreamCaptor));
         
         // Set test system properties
+        
         System.setProperty("TEST_DB_URL", "jdbc:postgresql://testhost:5432/testdb");
         System.setProperty("TEST_DB_USER", "testuser");
         System.setProperty("TEST_DB_PASSWORD", "testpass");

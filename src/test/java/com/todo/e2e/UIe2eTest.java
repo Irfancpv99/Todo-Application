@@ -32,13 +32,14 @@ public class UIe2eTest {
             ui = new UI(userService, todoService);
             ui.setVisible(true);
         });
-        Thread.sleep(500); // Allow UI to stabilize
+        Thread.sleep(500); 
     }
     
+
     @AfterEach
     void tearDown() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            // Dispose all windows
+            
             for (Window window : Window.getWindows()) {
                 window.dispose();
             }
@@ -103,7 +104,6 @@ public class UIe2eTest {
         });
         Thread.sleep(500);
 
-        // Then attempt login
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
@@ -168,7 +168,6 @@ public class UIe2eTest {
             ui.getUsernameField().setText("rapidUser");
             ui.getPasswordField().setText("rapidPass123");
 
-            // Simulate rapid button clicks
             for (int i = 0; i < 2 ; i++) {
                 ui.getRegisterButton().doClick();
                 ui.getLoginButton().doClick();
@@ -184,11 +183,10 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Complete Full User Registration And Login Cycle")
     void testCompleteUserCycle() throws Exception {
-        // Clean start
-        cleanDatabase();
+
+    	cleanDatabase();
         Thread.sleep(500);
 
-        // Register new user
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
@@ -196,7 +194,6 @@ public class UIe2eTest {
         });
         Thread.sleep(1000);
 
-        // Verify registration success
         SwingUtilities.invokeAndWait(() -> {
             assertTrue(ui.getUsernameField().getText().isEmpty(), 
                 "Username field should be cleared after registration");
@@ -204,21 +201,18 @@ public class UIe2eTest {
                 "Password field should be cleared after registration");
         });
 
-        // Perform login
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getLoginButton().doClick();
         });
-        Thread.sleep(1000); // Wait for TodoUI to appear
-
-        // Verify TodoUI state
+        Thread.sleep(1000); 
+        
         SwingUtilities.invokeAndWait(() -> {
-            // First verify login UI is hidden
-            assertFalse(ui.isVisible(), "Login UI should be hidden");
+        
+        	assertFalse(ui.isVisible(), "Login UI should be hidden");
 
-            // Find and verify TodoUI
-            TodoUI foundTodoUI = null;
+        	TodoUI foundTodoUI = null;
             for (Window window : Window.getWindows()) {
                 if (window instanceof TodoUI && window.isDisplayable()) {
                     foundTodoUI = (TodoUI) window;
@@ -226,12 +220,10 @@ public class UIe2eTest {
                 }
             }
 
-            // Verify TodoUI was found and is visible
             assertNotNull(foundTodoUI, "TodoUI instance should exist");
             assertTrue(foundTodoUI.isDisplayable(), "TodoUI should be displayable");
             assertTrue(foundTodoUI.isVisible(), "TodoUI should be visible");
 
-            // Verify username label if TodoUI was found
             if (foundTodoUI != null) {
                 try {
                     var field = TodoUI.class.getDeclaredField("usernameLabel");
@@ -250,7 +242,8 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Handle Concurrent User Operations")
     void testConcurrentUserOperations() throws Exception {
-        // Create multiple users rapidly
+       
+    	// Create multiple users rapidly
         for (int i = 0; i < 5; i++) {
             final int index = i;
             SwingUtilities.invokeAndWait(() -> {
@@ -261,7 +254,6 @@ public class UIe2eTest {
             Thread.sleep(200);
         }
 
-        // Try to login with each user
         for (int i = 0; i < 5; i++) {
             final int index = i;
             SwingUtilities.invokeAndWait(() -> {
@@ -276,18 +268,16 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Handle System State Recovery")
     void testSystemStateRecovery() throws Exception {
-        // Register user
-        SwingUtilities.invokeAndWait(() -> {
+    	
+    	SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
             ui.getRegisterButton().doClick();
         });
         Thread.sleep(500);
 
-        // Close UI
         SwingUtilities.invokeAndWait(() -> ui.dispose());
 
-        // Create new UI instance
         SwingUtilities.invokeAndWait(() -> {
             UserService userService = new UserService();
             TodoService todoService = new TodoService();
@@ -295,7 +285,6 @@ public class UIe2eTest {
             ui.setVisible(true);
         });
 
-        // Try to login with previous credentials
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
@@ -319,8 +308,8 @@ public class UIe2eTest {
     @Test
     @DisplayName("Should Handle UI Component States")
     void testUIComponentStates() throws Exception {
-        // Test initial state
-        SwingUtilities.invokeAndWait(() -> {
+       
+       SwingUtilities.invokeAndWait(() -> {
             assertTrue(ui.getRegisterButton().isEnabled());
             assertTrue(ui.getLoginButton().isEnabled());
             assertTrue(ui.getUsernameField().isEnabled());
@@ -329,7 +318,6 @@ public class UIe2eTest {
             assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
         });
 
-        // Test state after invalid input
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText("");
             ui.getPasswordField().setText("");
@@ -359,7 +347,7 @@ public class UIe2eTest {
         for (java.awt.Window window : java.awt.Window.getWindows()) {
             if (window instanceof UI) {
                 uiWindowFound = true;
-                window.dispose(); // Clean up
+                window.dispose(); 
                 break;
             }
         }

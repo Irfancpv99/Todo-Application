@@ -32,8 +32,6 @@ class UserServiceIntTest {
         assertNotNull(registeredUser);
         assertEquals(TEST_USERNAME, registeredUser.getUsername());
 
-        // Login with same credentials
-        
         User loggedInUser = userService.login(TEST_USERNAME, TEST_PASSWORD);
         assertNotNull(loggedInUser);
         assertEquals(registeredUser.getUsername(), loggedInUser.getUsername());
@@ -45,8 +43,6 @@ class UserServiceIntTest {
         String user1 = "user1";
         String user2 = "user2";
         String password = "password123";
-
-        // Multiple users register
         
         User registeredUser1 = userService.registerUser(user1, password);
         User registeredUser2 = userService.registerUser(user2, password);
@@ -57,7 +53,6 @@ class UserServiceIntTest {
         assertEquals(user2, registeredUser2.getUsername());
         assertNotEquals(registeredUser1.getUserid(), registeredUser2.getUserid());
 
-        // Verify both users can login
         
         User loggedInUser1 = userService.login(user1, password);
         User loggedInUser2 = userService.login(user2, password);
@@ -72,11 +67,9 @@ class UserServiceIntTest {
     @DisplayName("User Session Management")
     void testUserSessionFlow() {
     	
-        // Register user
     	
         User registeredUser = userService.registerUser(TEST_USERNAME, TEST_PASSWORD);
 
-        // Multiple successful login attempts should work
         
         User firstLogin = userService.login(TEST_USERNAME, TEST_PASSWORD);
         User secondLogin = userService.login(TEST_USERNAME, TEST_PASSWORD);
@@ -86,7 +79,6 @@ class UserServiceIntTest {
         assertEquals(registeredUser.getUsername(), firstLogin.getUsername());
         assertEquals(registeredUser.getUsername(), secondLogin.getUsername());
         
-        // Verify login fails with wrong password
         
         assertThrows(IllegalArgumentException.class, 
             () -> userService.login(TEST_USERNAME, "wrongpassword"));
@@ -96,17 +88,13 @@ class UserServiceIntTest {
     @DisplayName("User Registration State Persistence")
     void testUserStatePersistence() {
     	
-        // Register user with first service instance
         
     	userService.registerUser(TEST_USERNAME, TEST_PASSWORD);
         assertTrue(userService.isUsernameTaken(TEST_USERNAME));
-        
-        // Create new service instance and verify user still exists
-        
+                
         UserService newUserService = new UserService();
         assertTrue(newUserService.isUsernameTaken(TEST_USERNAME));
         
-        // Verify can still login with new service instance
         
         User loggedInUser = newUserService.login(TEST_USERNAME, TEST_PASSWORD);
         assertNotNull(loggedInUser);
@@ -116,19 +104,16 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Database State After Failed Registration")
     void testDatabaseStateAfterFailedRegistration() {
-        // Create initial user
-        User user = userService.registerUser("testuser", "password123");
+       
+    	User user = userService.registerUser("testuser", "password123");
         assertNotNull(user);
         
-        // Attempt to create user with same username
         assertThrows(IllegalArgumentException.class, () -> 
             userService.registerUser("testuser", "newpassword")
         );
         
-        // Verify database state
         assertTrue(userService.isUsernameTaken("testuser"));
         
-        // Verify original user can still login
         User loggedInUser = userService.login("testuser", "password123");
         assertNotNull(loggedInUser);
         assertEquals(user.getUserid(), loggedInUser.getUserid());
@@ -160,7 +145,6 @@ class UserServiceIntTest {
         assertEquals(numThreads, successCount.get());
         assertEquals(0, failCount.get());
         
-        // Verify all users were created and can login
         for (int i = 0; i < numThreads; i++) {
             User user = userService.login("user" + i, "password" + i);
             assertNotNull(user);
@@ -170,8 +154,8 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test Concurrent User Login")
     void testConcurrentUserLogin() throws InterruptedException {
-        // Register initial user
-        userService.registerUser("concurrentuser", "userpass");
+      
+    	userService.registerUser("concurrentuser", "userpass");
         
         int numThreads = 10;
         CountDownLatch latch = new CountDownLatch(numThreads);
@@ -185,7 +169,7 @@ class UserServiceIntTest {
                         successfulLogins.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    // Login failed
+        
                 } finally {
                     latch.countDown();
                 }
@@ -201,17 +185,15 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Username Uniqueness Constraint Test")
     void testUsernameUniquenessConstraint() {
-        // First registration should succeed
-        User firstUser = userService.registerUser("uniqueuser", "password123");
+        
+    	User firstUser = userService.registerUser("uniqueuser", "password123");
         assertNotNull(firstUser);
         
-        // Second registration with same username should fail
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
             userService.registerUser("uniqueuser", "differentpassword");
         });
         assertEquals("User already exists.", exception.getMessage());
         
-        // Original user should still be able to login
         User loggedInUser = userService.login("uniqueuser", "password123");
         assertNotNull(loggedInUser);
         assertEquals(firstUser.getUserid(), loggedInUser.getUserid());
@@ -220,7 +202,8 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test Registration Input Validation")
     void testRegistrationInputValidation() {
-        // Test null username
+       
+    	// Test null username
         assertThrows(IllegalArgumentException.class, () ->
             userService.registerUser(null, "password123")
         );
@@ -244,7 +227,8 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test Login Input Validation")
     void testLoginInputValidation() {
-        // Test null username
+       
+    	// Test null username
         assertThrows(IllegalArgumentException.class, () ->
             userService.login(null, "password123")
         );
@@ -268,20 +252,17 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test User Password Update Flow")
     void testUserPasswordUpdateFlow() {
-        // Register initial user
-        User user = userService.registerUser("passworduser", "oldpassword");
+      
+    	User user = userService.registerUser("passworduser", "oldpassword");
         assertNotNull(user);
         
-        // Verify login with old password
         User loggedInUser = userService.login("passworduser", "oldpassword");
         assertNotNull(loggedInUser);
         
-        // Register new user with same username should fail
         assertThrows(IllegalArgumentException.class, () ->
             userService.registerUser("passworduser", "differentpassword")
         );
         
-        // Verify original user can still login
         loggedInUser = userService.login("passworduser", "oldpassword");
         assertNotNull(loggedInUser);
         assertEquals(user.getUserid(), loggedInUser.getUserid());
@@ -290,17 +271,14 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test User Session Persistence")
     void testUserSessionPersistence() {
-        // Register user
-        User user = userService.registerUser("sessionuser", "sessionpass");
+       
+       User user = userService.registerUser("sessionuser", "sessionpass");
         assertNotNull(user);
         
-        // Create new service instance
         UserService newUserService = new UserService();
         
-        // Verify user exists in new service instance
         assertTrue(newUserService.isUsernameTaken("sessionuser"));
         
-        // Verify can login with new service instance
         User loggedInUser = newUserService.login("sessionuser", "sessionpass");
         assertNotNull(loggedInUser);
         assertEquals(user.getUserid(), loggedInUser.getUserid());
@@ -309,16 +287,13 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test Database Constraints")
     void testDatabaseConstraints() {
-        // Register initial user
         User user = userService.registerUser("constraintuser", "password123");
         assertNotNull(user);
 
-        // Attempt to register same username (should trigger unique constraint)
         assertThrows(IllegalArgumentException.class, () ->
             userService.registerUser("constraintuser", "different_password")
         );
 
-        // Verify original user still exists and can login
         User loggedInUser = userService.login("constraintuser", "password123");
         assertNotNull(loggedInUser);
         assertEquals(user.getUserid(), loggedInUser.getUserid());
@@ -327,21 +302,18 @@ class UserServiceIntTest {
     @Test
     @DisplayName("Test User Authentication Flow")
     void testUserAuthenticationFlow() {
-        // Register user
-        User user = userService.registerUser("authuser", "password123");
+       
+    	User user = userService.registerUser("authuser", "password123");
         assertNotNull(user);
 
-        // Test successful login
         User loggedInUser = userService.login("authuser", "password123");
         assertNotNull(loggedInUser);
         assertEquals(user.getUserid(), loggedInUser.getUserid());
 
-        // Test login with wrong password
         assertThrows(IllegalArgumentException.class, () ->
             userService.login("authuser", "wrongpassword")
         );
 
-        // Test login with non-existent user
         assertThrows(IllegalArgumentException.class, () ->
             userService.login("nonexistentuser", "password123")
         );

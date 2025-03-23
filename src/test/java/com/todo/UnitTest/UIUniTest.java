@@ -176,16 +176,6 @@ class UIUniTest {
 
         verify(userService).login(username, password);
     }
-    
-//    @Test
-//    @DisplayName("Should Handle Password With Spaces")
-//    void testPasswordWithSpaces() {
-//        ui.getUsernameField().setText("testuser");
-//        ui.getPasswordField().setText("pass word 123");
-//        ui.getRegisterButton().doClick();
-//
-//        assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty());
-//    }
     @Test
     @DisplayName("Should Handle Username With Only Spaces")
     void testUsernameWithOnlySpaces() {
@@ -240,12 +230,10 @@ class UIUniTest {
             .thenReturn(mockUser)
             .thenThrow(new IllegalArgumentException("Too many attempts"));
 
-        // First attempt
         ui.getUsernameField().setText(username);
         ui.getPasswordField().setText(password);
         ui.getLoginButton().doClick();
 
-        // Second rapid attempt
         ui.getUsernameField().setText(username);
         ui.getPasswordField().setText(password);
         ui.getLoginButton().doClick();

@@ -22,18 +22,15 @@ class UserIntTest {
     @Test
     @DisplayName("Complete User Lifecycle Test")
     void testUserLifecycle() {
-        // Create new user
-        User user = new User(1,TEST_USERNAME, TEST_PASSWORD);
         
-        // Verify user creation
+    	User user = new User(1,TEST_USERNAME, TEST_PASSWORD);
+        
         assertNotNull(user);
         assertEquals(TEST_USERNAME, user.getUsername());
         assertTrue(user.isValid());
         
-        // Test login functionality
         assertTrue(user.login(TEST_USERNAME, TEST_PASSWORD));
         
-        // Verify user ID assignment
         assertTrue(user.getUserid() > 0);
     }
     
@@ -42,10 +39,8 @@ class UserIntTest {
     void testAuthenticationFlow() {
         User user = new User(1,TEST_USERNAME, TEST_PASSWORD);
         
-        // Test successful login
         assertTrue(user.login(TEST_USERNAME, TEST_PASSWORD));
         
-        // Test failed login attempts
         assertFalse(user.login(TEST_USERNAME, "wrongPassword"));
         assertFalse(user.login("wrongUsername", TEST_PASSWORD));
         assertFalse(user.login("wrongUsername", "wrongPassword"));
@@ -58,13 +53,11 @@ class UserIntTest {
         User user2 = new User(2,"user2", "pass2");
         User user3 = new User(3,"user3", "pass3");
         
-        // Verify unique ID assignment
         
         assertNotEquals(user1.getUserid(), user2.getUserid());
         assertNotEquals(user2.getUserid(), user3.getUserid());
         assertNotEquals(user1.getUserid(), user3.getUserid());
         
-        // Verify ID incrementation
         
         assertTrue(user2.getUserid() > user1.getUserid());
         assertTrue(user3.getUserid() > user2.getUserid());
@@ -73,11 +66,10 @@ class UserIntTest {
     @Test
     @DisplayName("User Validation States Test")
     void testUserValidationStates() {
-        // Test valid user
-        User validUser = new User(1,TEST_USERNAME, TEST_PASSWORD);
+       
+    	User validUser = new User(1,TEST_USERNAME, TEST_PASSWORD);
         assertTrue(validUser.isValid());
         
-        // Test invalid states
         User nullUsername = new User(1,null, TEST_PASSWORD);
         User emptyUsername = new User(1,"", TEST_PASSWORD);
         User nullPassword = new User(1,TEST_USERNAME, null);
@@ -95,11 +87,9 @@ class UserIntTest {
         User user = new User(1,TEST_USERNAME, TEST_PASSWORD);
         String newUsername = "newTestUser";
         
-        // Test username modification
         user.setUsername(newUsername);
         assertEquals(newUsername, user.getUsername());
         
-        // Verify login still works with new username
         assertTrue(user.login(newUsername, TEST_PASSWORD));
         assertFalse(user.login(TEST_USERNAME, TEST_PASSWORD));
     }

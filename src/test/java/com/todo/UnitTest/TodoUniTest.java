@@ -46,7 +46,7 @@ class TodoUniTest {
         assertTrue(todo.isCompleted());
     }
 
-    // Title validation tests
+   
     @Test
     @DisplayName("Todo should not allow null title")
     void testNullTitle() {
@@ -80,7 +80,6 @@ class TodoUniTest {
         );
     }
 
-    // Description validation tests
     @Test
     @DisplayName("Todo should not allow null description")
     void testNullDescription() {
@@ -106,7 +105,6 @@ class TodoUniTest {
         );
     }
 
-    // Due date validation tests
     @Test
     @DisplayName("Todo should not allow null due date")
     void testNullDueDate() {
@@ -132,7 +130,6 @@ class TodoUniTest {
         assertEquals(today, todo.getDueDate());
     }
 
-    // Priority validation tests
     @Test
     @DisplayName("Todo should not allow null priority")
     void testNullPriority() {
@@ -151,7 +148,6 @@ class TodoUniTest {
         assertEquals(Status.COMPLETED, todo.getStatus());
     }
 
-    // Update tests
     @Test
     @DisplayName("Todo should allow valid updates to all fields")
     void testValidUpdates() {

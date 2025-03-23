@@ -35,8 +35,8 @@ class UserServiceUniTest {
     
     @AfterEach
     void tearDown() {
-        // Clean up any mock connection that might have been set
-        if (mockConnection != null) {
+        
+    	if (mockConnection != null) {
             DatabaseConfig.resetTestConnection();
             mockConnection = null;
         }

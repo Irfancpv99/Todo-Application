@@ -53,14 +53,13 @@ class TodoUIIntTest
                 todoService = new TodoService();
                 userService = new UserService();
                 
-                // Create test user and get userId
                 User testUser = userService.registerUser(TEST_USERNAME, TEST_PASSWORD);
                 userId = testUser.getUserid();
                 todoUI = new TodoUI(todoService, TEST_USERNAME, userId);
                 initializeComponents();
                 todoUI.setVisible(true);
             });
-            Thread.sleep(1000);// Allow UI to stabilize
+            Thread.sleep(1000);
         } catch (Exception e) {
             fail("Setup failed: " + e.getMessage());
         }
@@ -73,7 +72,7 @@ class TodoUIIntTest
                 if (todoUI != null) {
                     todoUI.dispose();
                 }
-                // Clean up test data
+               
                 UserService.clearUsers();
             });
         } catch (Exception e) {
@@ -116,11 +115,11 @@ class TodoUIIntTest
                 tagsComboBox.setSelectedItem(Tags.Work);
             });
 
-            // Increased wait time for UI update
+            
             Thread.sleep(500);
 
             SwingUtilities.invokeAndWait(() -> addButton.doClick());
-            Thread.sleep(1000);  // Increased wait time for add operation
+            Thread.sleep(1000); 
 
             SwingUtilities.invokeAndWait(() -> {
                 assertTrue(todoTable.getRowCount() > 0, "Todo should be added");
@@ -174,7 +173,7 @@ class TodoUIIntTest
     @Test
     void testUpdateMultipleFields() {
         try {
-            // First add a todo
+        	
             SwingUtilities.invokeAndWait(() -> {
                 titleField.setText("Original Title");
                 descriptionField.setText("Original Description");
@@ -184,16 +183,13 @@ class TodoUIIntTest
                 addButton.doClick();
             });
 
-            // Wait for the add operation to complete
             Thread.sleep(1000);
 
-            // Verify the todo was added
             SwingUtilities.invokeAndWait(() -> {
                 assertEquals(1, todoTable.getRowCount(), "Todo should be added");
                 assertEquals("Original Title", todoTable.getValueAt(0, 1));
             });
 
-            // Update the todo
             SwingUtilities.invokeAndWait(() -> {
                 todoTable.setRowSelectionInterval(0, 0);
                 titleField.setText("Updated Title");
@@ -203,10 +199,8 @@ class TodoUIIntTest
                 updateButton.doClick();
             });
 
-            // Wait for the update operation to complete
             Thread.sleep(1000);
 
-            // Verify the update
             SwingUtilities.invokeAndWait(() -> {
                 assertEquals("Updated Title", todoTable.getValueAt(0, 1));
                 assertEquals("Updated Description", todoTable.getValueAt(0, 2));
@@ -220,7 +214,6 @@ class TodoUIIntTest
     @Test
     void testTodoValidation() {
         try {
-            // Test empty title
             SwingUtilities.invokeAndWait(() -> {
                 titleField.setText("");
                 descriptionField.setText("Valid Description");
@@ -233,7 +226,6 @@ class TodoUIIntTest
                 assertEquals(0, todoTable.getRowCount(), "Todo with empty title should not be added");
             });
 
-            // Test invalid date
             SwingUtilities.invokeAndWait(() -> {
                 titleField.setText("Valid Title");
                 dateField.setText("invalid-date");
@@ -279,8 +271,7 @@ class TodoUIIntTest
         try {
             final CountDownLatch addLatch = new CountDownLatch(1);
             final CountDownLatch completeLatch = new CountDownLatch(1);
-
-            // Use invokeAndWait instead of invokeLater for the first operation
+            
             SwingUtilities.invokeAndWait(() -> {
                 titleField.setText("Test Mark Completed");
                 descriptionField.setText("Testing mark completed functionality");
@@ -292,17 +283,15 @@ class TodoUIIntTest
             });
 
             assertTrue(addLatch.await(5, TimeUnit.SECONDS));
-            // Increase wait time to ensure DB operation completes
+            
             Thread.sleep(2000);
-
-            // Use invokeAndWait for the second operation as well
+            
             SwingUtilities.invokeAndWait(() -> {
                 todoTable.setRowSelectionInterval(0, 0);
                 markCompletedButton.doClick();
                 completeLatch.countDown();
             });
 
-            // Increase timeout
             assertTrue(completeLatch.await(10, TimeUnit.SECONDS), "Operation timed out");
             Thread.sleep(1000);
 
@@ -326,14 +315,14 @@ class TodoUIIntTest
                     tagsComboBox.setSelectedItem(Tags.Work);
                     addButton.doClick();
                     try {
-                        Thread.sleep(200); // Small delay between adds
+                        Thread.sleep(200);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
                 }
             });
             
-            Thread.sleep(1000); // Wait for all DB operations
+            Thread.sleep(1000); 
             
             SwingUtilities.invokeAndWait(() -> {
                 assertEquals(5, todoTable.getRowCount(), "All todos should be added");
@@ -377,7 +366,7 @@ class TodoUIIntTest
                 todoService.setNextUserSpecificId(1);
                 addButton.doClick();
             });
-            Thread.sleep(500); // Wait for DB operation
+            Thread.sleep(500);
         } catch (Exception e) {
             fail("Failed to add test todo: " + e.getMessage());
         }

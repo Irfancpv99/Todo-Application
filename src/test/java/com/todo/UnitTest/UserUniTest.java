@@ -83,7 +83,6 @@ class UserUniTest {
 	    @DisplayName("User registration should fail if the username already exists")
 	    void testRegistrationFailsWithDuplicateUsername() {
 	        String username = "duplicateuser";
-//	        String password = "validPassword123";
 	        registeredUsernames.add(username);
 
 	        boolean isRegistered = registeredUsernames.add(username);
@@ -155,6 +154,7 @@ class UserUniTest {
 	    @Test
 	    @DisplayName("User IDs should increment correctly for each new registration")
 	    void testUserIdIncrement() {
+	    	
 	        // Arrange
 	        User user1 = new User(1,"user1", "password1");
 	        User user2 = new User(2,"user2", "password2");

@@ -105,9 +105,9 @@ public class UIIntTest {
         });
 
         SwingUtilities.invokeAndWait(() -> {
-            // Assert that the username is retained
+           
             assertEquals(TEST_USERNAME, ui.getUsernameField().getText(), "Username field should retain the invalid username.");
-            // Assert that the password is cleared
+           
             assertTrue(new String(ui.getPasswordField().getPassword()).isEmpty(), "Password field should be empty after failed login.");
         });
     }
@@ -130,11 +130,11 @@ public class UIIntTest {
     @Test
     @DisplayName("Should Handle Sequential Registration and Login")
     void testSequentialRegistrationAndLogin() throws Exception {
-        User mockUser = new User(1, TEST_USERNAME, TEST_PASSWORD);
+        
+    	User mockUser = new User(1, TEST_USERNAME, TEST_PASSWORD);
         when(userServiceMock.registerUser(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
         when(userServiceMock.login(TEST_USERNAME, TEST_PASSWORD)).thenReturn(mockUser);
 
-        // Register
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);
@@ -142,7 +142,6 @@ public class UIIntTest {
         });
         Thread.sleep(500);
 
-        // Login with same credentials
         SwingUtilities.invokeAndWait(() -> {
             ui.getUsernameField().setText(TEST_USERNAME);
             ui.getPasswordField().setText(TEST_PASSWORD);

@@ -4,25 +4,16 @@ import com.todo.model.Todo;
 import com.todo.model.Tags;
 import com.todo.model.Status;
 import com.todo.model.Priority;
-
-//import java.sql.Date;
 import java.time.LocalDate;
-
 import com.todo.service.TodoService;
 import com.todo.config.DatabaseConfig;
 import org.junit.jupiter.api.*;
-
-
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.sql.Connection;
-//import java.sql.ResultSet;
-//import java.sql.SQLException;
 import java.sql.Statement;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-//import static org.mockito.Mockito.*;
-
 
 class TodoServiceUniTest {
     private TodoService todoService;
@@ -199,8 +190,8 @@ class TodoServiceUniTest {
     @Test
     @DisplayName("Test Todo Priority Updates")
     void testTodoPriorityUpdates() {
-        // Create initial todo with LOW priority
-        Todo todo = todoService.createTodo(
+        
+    	Todo todo = todoService.createTodo(
             1,
             TEST_USER_ID,
             "Priority Test",
@@ -223,7 +214,6 @@ class TodoServiceUniTest {
         );
         assertEquals(Priority.MEDIUM, todo.getPriority());
         
-        // Update to HIGH priority
         todo = todoService.updateTodo(
             todo.getId(),
             TEST_USER_ID,
@@ -240,8 +230,8 @@ class TodoServiceUniTest {
     @Test
     @DisplayName("Test Todo Tag Updates")
     void testTodoTagUpdates() {
-        // Create todo with Work tag
-        Todo todo = todoService.createTodo(
+        
+    	Todo todo = todoService.createTodo(
             1,
             TEST_USER_ID,
             "Tag Test",
@@ -264,7 +254,6 @@ class TodoServiceUniTest {
         );
         assertEquals(Tags.Home, todo.getTags());
         
-        // Update to Urgent tag
         todo = todoService.updateTodo(
             todo.getId(),
             TEST_USER_ID,
@@ -281,8 +270,8 @@ class TodoServiceUniTest {
     @Test
     @DisplayName("Test Todo Due Date Validation")
     void testTodoDueDateValidation() {
-        // Create todo with future date
-        LocalDate futureDate = LocalDate.now().plusDays(7);
+       
+    	LocalDate futureDate = LocalDate.now().plusDays(7);
         Todo todo = todoService.createTodo(
             1,
             TEST_USER_ID,
@@ -294,7 +283,6 @@ class TodoServiceUniTest {
         );
         assertEquals(futureDate, todo.getDueDate());
         
-        // Update with new future date
         LocalDate newFutureDate = LocalDate.now().plusDays(14);
         todo = todoService.updateTodo(
             todo.getId(),
@@ -352,7 +340,6 @@ class TodoServiceUniTest {
         assertNotNull(todo);
         assertEquals(validDescription, todo.getDescription());
         
-        // Test with too long description (60 chars)
         String tooLongDescription = "a".repeat(60);
         assertThrows(RuntimeException.class, () -> {
             todoService.createTodo(

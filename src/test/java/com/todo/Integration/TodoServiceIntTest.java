@@ -316,7 +316,8 @@ class TodoServiceIntTest {
     @Test
     @DisplayName("Input Validation Tests")
     void testTodoInputValidation() {
-        // Test null/empty title
+      
+    	// Test null/empty title
         assertThrows(IllegalArgumentException.class, () ->
             todoService.createTodo(1, userId, null, "Description", 
                 LocalDate.now(), Priority.LOW, Tags.Work)
@@ -475,15 +476,15 @@ class TodoServiceIntTest {
         
         Todo invalidValuesTodo = todoService.getTodoById(998);
         assertNotNull(invalidValuesTodo);
-        assertEquals(Priority.MEDIUM, invalidValuesTodo.getPriority()); // Should use default priority
-        assertEquals(Tags.Work, invalidValuesTodo.getTags()); // Should use default tag
-        assertEquals(Status.PENDING, invalidValuesTodo.getStatus()); // Should use default status based on completed flag
+        assertEquals(Priority.MEDIUM, invalidValuesTodo.getPriority());
+        assertEquals(Tags.Work, invalidValuesTodo.getTags());
+        assertEquals(Status.PENDING, invalidValuesTodo.getStatus()); 
         
         Todo nullFieldsTodo = todoService.getTodoById(999);
         assertNotNull(nullFieldsTodo);
-        assertEquals(Priority.MEDIUM, nullFieldsTodo.getPriority()); // Should use default priority
-        assertEquals(Tags.Work, nullFieldsTodo.getTags()); // Should use default tag
-        assertEquals(Status.PENDING, nullFieldsTodo.getStatus()); // Should use default status based on completed flag
+        assertEquals(Priority.MEDIUM, nullFieldsTodo.getPriority()); 
+        assertEquals(Tags.Work, nullFieldsTodo.getTags()); 
+        assertEquals(Status.PENDING, nullFieldsTodo.getStatus()); 
     }
 
     @Test
